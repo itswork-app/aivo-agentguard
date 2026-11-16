@@ -7,9 +7,9 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    AuthorizationAttestationV1, CanonicalizationError, CryptoError, Decision, ProtocolShapeError,
-    SignatureEnvelope, SignedAuthorizationAttestationV1, SignedSigningChallengeV1,
-    canonical_json, domain_digest, hex_digest, verify_ed25519,
+    CanonicalizationError, CryptoError, Decision, ProtocolShapeError, SignatureEnvelope,
+    SignedAuthorizationAttestationV1, SignedSigningChallengeV1, canonical_json, hex_digest,
+    verify_ed25519,
     protocol::{parse_timestamp, validate_hex_digest, validate_identifier, validate_lifetime},
 };
 
@@ -161,10 +161,6 @@ struct PermitEnvelopeV2SigningPayload<'a> {
 pub enum PermitEnvelopeError {
     #[error("unsupported permit envelope version; G3 requires v2")]
     UnsupportedEnvelopeVersion,
-    #[error("invalid permit or envelope claim shape")]
-    InvalidShape,
-    #[error("permit decision must be ALLOW")]
-    DecisionNotAllowed,
     #[error("permit or envelope signature key ID mismatch")]
     KeyIdMismatch,
     #[error("policy provenance does not match the permit and attestation")]
@@ -183,6 +179,10 @@ pub enum PermitEnvelopeError {
     Canonicalization(String),
     #[error("cryptographic verification failed: {0}")]
     Crypto(#[from] CryptoError),
+    #[error("challenge signature verification failed: {0}")]
+    ChallengeSignature(String),
+    #[error("attestation signature verification failed: {0}")]
+    AttestationSignature(String),
 }
 
 impl PermitEnvelopeV2 {
@@ -348,14 +348,64 @@ impl PermitEnvelopeV2 {
     ///
     /// # Errors
     ///
-    /// Returns an error for invalid G1 claims, key ID mismatch, canonicalization
-    /// failure, or invalid Ed25519 signature.
+    /// Returns an error for invalid envelope shape, G1 claims, key ID mismatch,
+    /// canonicalization failure, or invalid Ed25519 signature.
     pub fn verify_inner_permit_signature(
         &self,
         public_key: &[u8; 32],
     ) -> Result<(), PermitEnvelopeError> {
+        self.validate_shape()?;
         self.permit_claims_v1
             .verify_signature(&self.permit_signature_v1, public_key)
+    }
+
+    /// Verify the challenge signature with the caller-resolved permit-purpose key.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when challenge shape or its Ed25519 signature is invalid.
+    pub fn verify_challenge_signature(
+        &self,
+        public_key: &[u8; 32],
+    ) -> Result<(), PermitEnvelopeError> {
+        self.signing_challenge_v1
+            .verify_signature(public_key)
+            .map_err(|error| PermitEnvelopeError::ChallengeSignature(error.to_string()))
+    }
+
+    /// Verify the authorization attestation with the caller-resolved issuer-purpose key.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when attestation shape or its Ed25519 signature is invalid.
+    pub fn verify_attestation_signature(
+        &self,
+        public_key: &[u8; 32],
+    ) -> Result<(), PermitEnvelopeError> {
+        self.authorization_attestation_v1
+            .verify_signature(public_key)
+            .map_err(|error| PermitEnvelopeError::AttestationSignature(error.to_string()))
+    }
+
+    /// Verify all four signatures independently after the caller resolves each purpose-scoped key.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any claim binding or any inner permit, challenge,
+    /// attestation, or outer envelope signature is invalid.
+    pub fn verify_all_signatures(
+        &self,
+        inner_permit_key: &[u8; 32],
+        challenge_key: &[u8; 32],
+        attestation_key: &[u8; 32],
+        envelope_key: &[u8; 32],
+    ) -> Result<(), PermitEnvelopeError> {
+        self.validate_shape()?;
+        self.verify_inner_permit_signature(inner_permit_key)?;
+        self.verify_challenge_signature(challenge_key)?;
+        self.verify_attestation_signature(attestation_key)?;
+        self.verify_outer_signature(envelope_key)?;
+        Ok(())
     }
 }
 
