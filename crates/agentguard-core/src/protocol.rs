@@ -170,6 +170,11 @@ pub enum ProtocolShapeError {
 
 impl SigningChallengeV1 {
     /// Validate structural invariants and the maximum 30-second challenge TTL.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for unsupported versions, malformed identifiers/digests,
+    /// invalid UTC timestamps, or a challenge lifetime outside the 30-second limit.
     pub fn validate(&self) -> Result<(), ProtocolShapeError> {
         if self.schema_version != 1 {
             return Err(ProtocolShapeError::UnsupportedSchemaVersion);
@@ -193,6 +198,10 @@ impl SigningChallengeV1 {
 
 impl SignedSigningChallengeV1 {
     /// Validate claims and enforce signature-key ID equality.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when claims are malformed or the signature key ID differs.
     pub fn validate_shape(&self) -> Result<(), ProtocolShapeError> {
         self.claims.validate()?;
         self.signature
@@ -207,6 +216,10 @@ impl SignedSigningChallengeV1 {
     }
 
     /// Build the exact signed message for the challenge claims.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if canonical JSON serialization fails.
     pub fn signing_message(&self) -> Result<Vec<u8>, CanonicalizationError> {
         let canonical = canonical_json(&self.claims)?;
         let mut message = b"AIVO-AGENTGUARD-SIGNING-CHALLENGE-V1\0".to_vec();
@@ -215,6 +228,10 @@ impl SignedSigningChallengeV1 {
     }
 
     /// Verify the challenge signature using a caller-resolved permit-purpose key.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid claims, serialization failure, or an invalid signature.
     pub fn verify_signature(
         &self,
         public_key: &[u8; 32],
@@ -229,6 +246,10 @@ impl SignedSigningChallengeV1 {
     }
 
     /// Digest the complete canonical challenge token including its signature envelope.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if canonical JSON serialization fails.
     pub fn digest(&self) -> Result<[u8; 32], CanonicalizationError> {
         let bytes = canonical_json(self)?;
         Ok(domain_digest(
@@ -240,6 +261,11 @@ impl SignedSigningChallengeV1 {
 
 impl AuthorizationAttestationV1 {
     /// Validate all claim-shape invariants and the maximum 30-second attestation TTL.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for unsupported versions, non-ALLOW decisions, malformed
+    /// identifiers/digests, tenant mismatch, or an invalid attestation lifetime.
     pub fn validate(&self) -> Result<(), ProtocolShapeError> {
         if self.schema_version != 1 {
             return Err(ProtocolShapeError::UnsupportedSchemaVersion);
@@ -289,6 +315,10 @@ impl AuthorizationAttestationV1 {
 
 impl SignedAuthorizationAttestationV1 {
     /// Validate claims and require the signature key ID to match the signed issuer key ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when claims are malformed or the signature key ID differs.
     pub fn validate_shape(&self) -> Result<(), ProtocolShapeError> {
         self.claims.validate()?;
         self.signature
@@ -303,6 +333,10 @@ impl SignedAuthorizationAttestationV1 {
     }
 
     /// Build the exact signed message for the attestation claims.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if canonical JSON serialization fails.
     pub fn signing_message(&self) -> Result<Vec<u8>, CanonicalizationError> {
         let canonical = canonical_json(&self.claims)?;
         let mut message = b"AIVO-AGENTGUARD-AUTH-ATTESTATION-V1\0".to_vec();
@@ -311,6 +345,10 @@ impl SignedAuthorizationAttestationV1 {
     }
 
     /// Verify the attestation signature using a caller-resolved issuer-purpose key.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid claims, serialization failure, or an invalid signature.
     pub fn verify_signature(
         &self,
         public_key: &[u8; 32],
@@ -326,6 +364,10 @@ impl SignedAuthorizationAttestationV1 {
 
     /// Require exact challenge, tenant, request, action, policy and context binding.
     /// Digest the complete canonical attestation and signature envelope.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if canonical JSON serialization fails.
     pub fn digest(&self) -> Result<[u8; 32], CanonicalizationError> {
         let canonical = canonical_json(self)?;
         Ok(domain_digest(
