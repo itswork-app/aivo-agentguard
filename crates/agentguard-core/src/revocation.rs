@@ -86,6 +86,8 @@ pub enum RevocationError {
     StaleOrFuture,
     #[error("revocation snapshot signature key ID mismatch")]
     KeyIdMismatch,
+    #[error("revocation snapshot registry does not match the pinned registry")]
+    RegistryMismatch,
     #[error("revocation snapshot signature verification failed: {0}")]
     Crypto(#[from] CryptoError),
     #[error("revocation snapshot canonicalization failed: {0}")]
@@ -204,7 +206,15 @@ impl SignedRevocationSnapshotV1 {
     ///
     /// Returns an error for invalid snapshot shape, stale status, key mismatch,
     /// canonicalization failure, or signature verification failure.
-    pub fn verify_at(&self, public_key: &[u8; 32], now_utc: &str) -> Result<(), RevocationError> {
+    pub fn verify_at(
+        &self,
+        public_key: &[u8; 32],
+        expected_registry_id: &str,
+        now_utc: &str,
+    ) -> Result<(), RevocationError> {
+        if expected_registry_id.is_empty() || self.claims.registry_id != expected_registry_id {
+            return Err(RevocationError::RegistryMismatch);
+        }
         self.claims.validate_at(now_utc)?;
         self.signature
             .validate_shape()
@@ -226,7 +236,7 @@ impl SignedRevocationSnapshotV1 {
     /// # Errors
     ///
     /// Returns an error if canonical digest generation fails.
-    pub fn high_water_mark(&self) -> Result<RevocationHighWaterMark, RevocationError> {
+    fn high_water_mark(&self) -> Result<RevocationHighWaterMark, RevocationError> {
         Ok(RevocationHighWaterMark {
             registry_id: self.claims.registry_id.clone(),
             registry_epoch: self.claims.registry_epoch,
@@ -238,6 +248,22 @@ impl SignedRevocationSnapshotV1 {
             ),
             this_update: self.claims.this_update.clone(),
         })
+    }
+
+    /// Verify the signed snapshot against the pinned registry and derive its checkpoint.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for registry mismatch, stale status, invalid signature,
+    /// malformed claims, or canonicalization failure.
+    pub fn verified_high_water_mark(
+        &self,
+        public_key: &[u8; 32],
+        expected_registry_id: &str,
+        now_utc: &str,
+    ) -> Result<RevocationHighWaterMark, RevocationError> {
+        self.verify_at(public_key, expected_registry_id, now_utc)?;
+        self.high_water_mark()
     }
 }
 
@@ -325,7 +351,8 @@ fn parse_timestamp(value: &str) -> Result<i64, RevocationError> {
     let hour = number(11..13);
     let minute = number(14..16);
     let second = number(17..19);
-    if !(1..=12).contains(&month)
+    if year < 1
+        || !(1..=12).contains(&month)
         || !(0..=23).contains(&hour)
         || !(0..=59).contains(&minute)
         || !(0..=59).contains(&second)
@@ -364,6 +391,35 @@ mod tests {
             snapshot_digest: digest.into(),
             this_update: updated.into(),
         }
+    }
+
+    #[test]
+    fn exact_subject_lookup_returns_unknown_when_missing() {
+        let snapshot = RevocationSnapshotV1 {
+            schema_version: 1,
+            registry_id: "registry-1".into(),
+            registry_epoch: 1,
+            sequence: 1,
+            issued_at: "2026-11-17T10:00:00Z".into(),
+            this_update: "2026-11-17T10:00:00Z".into(),
+            next_update: "2026-11-17T10:00:30Z".into(),
+            entries: vec![RevocationEntryV1 {
+                subject_type: RevocationSubjectType::PermitSignerKey,
+                subject_id: "permit-key-1".into(),
+                status: RevocationStatus::Active,
+                effective_at: "2026-11-17T10:00:00Z".into(),
+                reason_code: None,
+            }],
+            signing_key_id: "revocation-key-1".into(),
+        };
+        assert_eq!(
+            snapshot.status_for(RevocationSubjectType::PermitSignerKey, "permit-key-1"),
+            RevocationStatus::Active
+        );
+        assert_eq!(
+            snapshot.status_for(RevocationSubjectType::PermitSignerKey, "missing-key"),
+            RevocationStatus::Unknown
+        );
     }
 
     #[test]
