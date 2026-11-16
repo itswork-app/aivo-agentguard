@@ -1,6 +1,6 @@
 # ADR-0005: Approval Is Not Authorization; Permits Are Short-Lived and Single-Use
 
-- **Status:** Proposed
+- **Status:** Accepted — product owner approved 2026-11-16
 - **Date:** 2026-11-16
 - **Decision owners:** Project maintainer
 
