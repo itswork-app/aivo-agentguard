@@ -1,6 +1,6 @@
 # ADR-0003: Canonicalization and Action Digests
 
-- **Status:** Proposed
+- **Status:** Accepted — product owner approved 2026-11-16
 - **Date:** 2026-11-16
 - **Decision owners:** Project maintainer
 
