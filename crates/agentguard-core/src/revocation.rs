@@ -74,6 +74,101 @@ pub struct RevocationHighWaterMark {
     pub this_update: String,
 }
 
+/// Errors from the durable rollback-resistant high-water-mark store contract.
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+pub enum RevocationStoreError {
+    #[error("revocation state store is unavailable")]
+    Unavailable,
+    #[error("revocation state store contains corrupt or unverifiable state")]
+    CorruptState,
+    #[error("revocation state changed concurrently; retry from a fresh read")]
+    CompareAndSetConflict,
+    #[error("revocation checkpoint is already initialized")]
+    AlreadyInitialized,
+}
+
+/// Persistence contract for revocation monotonic state.
+///
+/// Implementations MUST provide durable, rollback-resistant storage. The
+/// compare-and-set operation MUST be linearizable across all enforcement nodes.
+/// A plain in-memory map or eventually consistent cache does not satisfy this
+/// contract and MUST NOT be used as the production implementation.
+pub trait RevocationHighWaterMarkStore: Send + Sync {
+    /// Load the current trusted checkpoint for one pinned registry.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the store is unavailable or persisted state is corrupt.
+    fn load(
+        &self,
+        registry_id: &str,
+    ) -> Result<Option<RevocationHighWaterMark>, RevocationStoreError>;
+
+    /// Initialize an empty registry checkpoint from an out-of-band trusted source.
+    ///
+    /// This operation MUST be restricted to the separately authorized recovery
+    /// or bootstrap control plane, not ordinary network snapshot ingestion.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the store is unavailable, corrupt, or already initialized.
+    fn initialize_from_trusted_checkpoint(
+        &self,
+        checkpoint: &RevocationHighWaterMark,
+    ) -> Result<(), RevocationStoreError>;
+
+    /// Atomically replace the expected checkpoint with the next checkpoint.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the store is unavailable, corrupt, or the expected
+    /// checkpoint no longer matches the current state.
+    fn compare_and_set(
+        &self,
+        expected: &RevocationHighWaterMark,
+        next: &RevocationHighWaterMark,
+    ) -> Result<(), RevocationStoreError>;
+}
+
+/// Errors while verifying and persisting a new revocation snapshot.
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+pub enum RevocationPersistenceError {
+    #[error("revocation state has no trusted bootstrap checkpoint")]
+    Uninitialized,
+    #[error("revocation validation failed: {0}")]
+    Validation(#[from] RevocationError),
+    #[error("revocation state persistence failed: {0}")]
+    Store(#[from] RevocationStoreError),
+}
+
+/// Verify a signed snapshot and atomically advance the trusted high-water mark.
+///
+/// Returns false for an exact idempotent replay and true when the checkpoint
+/// was advanced. It never initializes missing state from an ordinary network snapshot.
+///
+/// # Errors
+///
+/// Returns an error for invalid signatures, stale snapshots, registry mismatch,
+/// missing trusted bootstrap state, rollback/equivocation, or storage failures.
+pub fn persist_verified_snapshot<S: RevocationHighWaterMarkStore>(
+    store: &S,
+    snapshot: &SignedRevocationSnapshotV1,
+    public_key: &[u8; 32],
+    expected_registry_id: &str,
+    now_utc: &str,
+) -> Result<bool, RevocationPersistenceError> {
+    let candidate = snapshot.verified_high_water_mark(public_key, expected_registry_id, now_utc)?;
+    let previous = store
+        .load(expected_registry_id)?
+        .ok_or(RevocationPersistenceError::Uninitialized)?;
+    let should_advance = validate_progression(Some(&previous), &candidate)?;
+    if !should_advance {
+        return Ok(false);
+    }
+    store.compare_and_set(&previous, &candidate)?;
+    Ok(true)
+}
+
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum RevocationError {
     #[error("invalid revocation snapshot schema or field")]
