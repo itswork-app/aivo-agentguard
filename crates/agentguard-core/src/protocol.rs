@@ -55,13 +55,16 @@ impl SignatureEnvelope {
         {
             return Err(ProtocolShapeError::InvalidKeyId);
         }
+        if self.signature.is_empty() {
+            return Err(ProtocolShapeError::EmptySignature);
+        }
         if self.signature.len() != 86
             || !self
                 .signature
                 .bytes()
                 .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
         {
-            return Err(ProtocolShapeError::EmptySignature);
+            return Err(ProtocolShapeError::InvalidSignatureEncoding);
         }
         Ok(())
     }
@@ -160,6 +163,8 @@ pub enum ProtocolShapeError {
     InvalidKeyId,
     #[error("signature is empty")]
     EmptySignature,
+    #[error("signature is not canonical unpadded base64url")]
+    InvalidSignatureEncoding,
     #[error("unsupported schema version")]
     UnsupportedSchemaVersion,
     #[error("required identifier is empty or contains surrounding whitespace")]
@@ -743,7 +748,7 @@ mod tests {
         };
         assert_eq!(
             invalid_length.validate_shape(),
-            Err(ProtocolShapeError::EmptySignature)
+            Err(ProtocolShapeError::InvalidSignatureEncoding)
         );
 
         let invalid_character = SignatureEnvelope {
@@ -753,7 +758,7 @@ mod tests {
         };
         assert_eq!(
             invalid_character.validate_shape(),
-            Err(ProtocolShapeError::EmptySignature)
+            Err(ProtocolShapeError::InvalidSignatureEncoding)
         );
     }
 
