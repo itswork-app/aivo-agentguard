@@ -1,49 +1,17 @@
-# Authorization Contract
+# Authorization Contract — Bootstrap Record
 
-**Status:** Draft — provisional, not a stable API
+**Status:** Superseded by G1 specification set  
+**Superseded by:** `AUTHORIZATION-LIFECYCLE.md`, `POLICY-SCHEMA.md`, `DOMAIN-MODEL.md`, and `API-CONTRACT-V1.md`
 
-## Request
+This document records the initial G0 authorization principles. It is retained for project history and must not be treated as the complete or current normative contract.
 
-An authorization request must identify, at minimum:
+The enduring invariants are:
+- The authorization boundary exposes `ALLOW`, `DENY`, or `REQUIRE_APPROVAL`.
+- `REQUIRE_APPROVAL` is not permission to execute.
+- Approval must be authenticated and bound to the exact request and action.
+- Policy must be re-evaluated against current trusted context after approval.
+- Only a fresh `ALLOW` may produce a permit.
+- Missing, malformed, stale, unknown, or unverifiable inputs fail closed.
+- Evidence is append-only; corrections use linked events.
 
-- schema version;
-- tenant and requesting principal;
-- agent identity;
-- action type and canonical action payload or digest;
-- policy identifier and version;
-- context values with source and freshness metadata;
-- unique request identifier and replay-protection material.
-
-Exact field names and serialization are deferred to a versioned API specification.
-
-## Decision
-
-The policy engine returns one of:
-
-| Decision | Meaning | May execute immediately? |
-|---|---|---:|
-| `ALLOW` | Current policy permits this exact action under evaluated context. | Only after enforcement verifies binding and freshness. |
-| `DENY` | Policy prohibits the action or required trust conditions are not met. | No |
-| `REQUIRE_APPROVAL` | An independent approval workflow is required. | No |
-
-## Approval lifecycle
-
-1. Record the approval requirement.
-2. Authenticate and authorize the approver under a separately specified approval policy.
-3. Bind approval to the exact request/action digest, policy version, and expiry.
-4. Re-resolve time-sensitive context and re-evaluate policy.
-5. Proceed only if the new decision is `ALLOW` and enforcement validates the binding.
-
-Approval must never convert a previous `REQUIRE_APPROVAL` result directly into execution permission.
-
-## Fail-closed conditions
-
-Malformed input, unknown schema, unknown policy version, invalid identity, stale context, replay, failed integrity checks, or unavailable authoritative policy must never yield `ALLOW`.
-
-## Evidence events
-
-The lifecycle should produce linked events for request receipt, decision, approval request, approval result, post-approval re-evaluation, enforcement attempt, and observed execution outcome. Events must be append-only; corrections use compensating events.
-
-## Not yet specified
-
-Canonical encoding, cryptographic signatures, hash chaining, event storage, retention, privacy redaction, and transport semantics require dedicated specifications and ADRs.
+The G1 documents define the proposed request envelope, policy schema, combining algorithm, canonicalization, permit lifecycle, evidence format, and API contract. They remain Proposed until explicit product-owner approval.
