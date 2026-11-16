@@ -90,7 +90,24 @@ pub enum RevocationSourceError {
     InvalidResponse,
 }
 
-/// Durable tenant-scoped record consumed before any protected side effect.
+/// Trusted action/request values recomputed by the enforcement adapter.
+///
+/// These values MUST be derived from the exact action payload and authenticated
+/// principal at the enforcement boundary, not copied from the permit envelope.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExpectedExecutionContextV1 {
+    pub tenant_id: String,
+    pub principal_id: String,
+    pub agent_id: String,
+    pub request_id: String,
+    pub request_digest: String,
+    pub action_digest: String,
+    pub policy_id: String,
+    pub policy_version: String,
+    pub policy_digest: String,
+    pub context_digest: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PermitConsumptionRecordV1 {
@@ -171,6 +188,8 @@ pub enum EnforcementError {
     Consumption(#[from] PermitConsumptionStoreError),
     #[error("resolved key metadata differs from requested key ID or purpose")]
     ResolvedKeyMismatch,
+    #[error("permit does not match the independently derived execution context")]
+    ExecutionContextMismatch,
 }
 
 /// Verify all G3 signatures, fresh revocation status, bindings, and expiry,
@@ -189,6 +208,7 @@ pub enum EnforcementError {
 /// envelope mismatch, or permit replay/store failure.
 pub fn verify_and_consume<K, C, R, H, P>(
     envelope: &PermitEnvelopeV2,
+    expected: &ExpectedExecutionContextV1,
     keys: &K,
     clock: &C,
     revocation_source: &R,
@@ -204,6 +224,24 @@ where
 {
     let now_utc = clock.now_utc()?;
     envelope.validate_at(&now_utc)?;
+
+    let permit = &envelope.permit_claims_v1;
+    let attestation_claims = &envelope.authorization_attestation_v1.claims;
+    if permit.tenant_id != expected.tenant_id
+        || permit.principal_id != expected.principal_id
+        || permit.agent_id != expected.agent_id
+        || permit.request_id != expected.request_id
+        || permit.action_digest != expected.action_digest
+        || permit.policy_id != expected.policy_id
+        || permit.policy_version != expected.policy_version
+        || permit.policy_digest != expected.policy_digest
+        || permit.context_digest != expected.context_digest
+        || attestation_claims.request_digest != expected.request_digest
+        || attestation_claims.action_digest != expected.action_digest
+        || attestation_claims.context_digest != expected.context_digest
+    {
+        return Err(EnforcementError::ExecutionContextMismatch);
+    }
 
     let permit_key = resolve_key(
         keys,
@@ -300,7 +338,7 @@ where
         permit_id: permit.permit_id.clone(),
         permit_nonce: permit.nonce.clone(),
         request_id: permit.request_id.clone(),
-        request_digest: claims.request_digest.clone(),
+        request_digest: expected.request_digest.clone(),
         action_digest: permit.action_digest.clone(),
         policy_digest: permit.policy_digest.clone(),
         envelope_digest: envelope_digest.clone(),
