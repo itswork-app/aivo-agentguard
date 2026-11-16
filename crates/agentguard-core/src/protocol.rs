@@ -328,6 +328,15 @@ impl SignedAuthorizationAttestationV1 {
     }
 
     /// Require exact challenge, tenant, request, action, policy and context binding.
+    /// Digest the complete canonical attestation and signature envelope.
+    pub fn digest(&self) -> Result<[u8; 32], CanonicalizationError> {
+        let canonical = canonical_json(self)?;
+        Ok(domain_digest(
+            b"AIVO-AGENTGUARD-ATTESTATION-REF-V1\\0",
+            &canonical,
+        ))
+    }
+
     pub fn validate_challenge_binding(
         &self,
         challenge: &SignedSigningChallengeV1,
@@ -423,7 +432,8 @@ fn parse_timestamp(value: &str) -> Result<i64, ProtocolShapeError> {
     let minute = number(14..16);
     let second = number(17..19);
 
-    if !(1..=12).contains(&month)
+    if year < 1
+        || !(1..=12).contains(&month)
         || !(0..=23).contains(&hour)
         || !(0..=59).contains(&minute)
         || !(0..=59).contains(&second)
