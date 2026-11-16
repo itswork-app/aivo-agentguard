@@ -25,6 +25,7 @@
 ## 3. PermitEnvelopeV2 binding
 
 - Valid envelope verifies inner G1 signature, outer signature, and attestation signature.
+- Revoking either the inner G1 permit-signing key or outer envelope-signing key rejects enforcement.
 - Any mismatch in tenant, principal, agent, request, action, policy, context, decision, issuer, key ID, or digest is rejected.
 - Substituting an attestation, policy provenance object, inner permit, or signature after envelope signing is rejected.
 - Missing attestation binding or policy issuer provenance is rejected.
