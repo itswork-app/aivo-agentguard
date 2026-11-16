@@ -21,7 +21,7 @@ pub enum RevocationStatus {
     Unknown,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum RevocationSubjectType {
     PolicyIssuer,
@@ -244,7 +244,7 @@ impl RevocationSnapshotV1 {
             return Err(RevocationError::StaleOrFuture);
         }
 
-        let mut previous: Option<(RevocationSubjectType, &str)> = None;
+        let mut previous: Option<(&str, &str)> = None;
         for entry in &self.entries {
             if entry.subject_id.is_empty()
                 || entry.subject_id.trim() != entry.subject_id
@@ -258,12 +258,18 @@ impl RevocationSnapshotV1 {
                 return Err(RevocationError::InvalidShape);
             }
             if let Some(prior) = previous {
-                let current = (entry.subject_type, entry.subject_id.as_str());
+                let current = (
+                    subject_type_key(entry.subject_type),
+                    entry.subject_id.as_str(),
+                );
                 if current <= prior {
                     return Err(RevocationError::EntriesNotCanonical);
                 }
             }
-            previous = Some((entry.subject_type, entry.subject_id.as_str()));
+            previous = Some((
+                subject_type_key(entry.subject_type),
+                entry.subject_id.as_str(),
+            ));
         }
         Ok(())
     }
@@ -403,6 +409,18 @@ pub fn validate_progression(
         return Err(RevocationError::UpdateRollback);
     }
     Ok(true)
+}
+
+fn subject_type_key(subject_type: RevocationSubjectType) -> &'static str {
+    match subject_type {
+        RevocationSubjectType::AttestationIssuer => "attestation_issuer",
+        RevocationSubjectType::AttestationIssuerKey => "attestation_issuer_key",
+        RevocationSubjectType::EvidenceServiceKey => "evidence_service_key",
+        RevocationSubjectType::PermitSignerKey => "permit_signer_key",
+        RevocationSubjectType::Policy => "policy",
+        RevocationSubjectType::PolicyIssuer => "policy_issuer",
+        RevocationSubjectType::PolicyIssuerKey => "policy_issuer_key",
+    }
 }
 
 fn validate_high_water_mark(mark: &RevocationHighWaterMark) -> Result<(), RevocationError> {
@@ -578,6 +596,40 @@ mod tests {
         assert_eq!(
             validate_progression(None, &mark(2, 1, &"aa".repeat(32), "2026-11-17T10:00:00Z")),
             Err(RevocationError::InvalidShape)
+        );
+    }
+
+    #[test]
+    fn snapshot_entries_must_follow_lexicographic_subject_type_order() {
+        let snapshot = RevocationSnapshotV1 {
+            schema_version: 1,
+            registry_id: "registry-1".into(),
+            registry_epoch: 1,
+            sequence: 1,
+            issued_at: "2026-11-17T10:00:00Z".into(),
+            this_update: "2026-11-17T10:00:00Z".into(),
+            next_update: "2026-11-17T10:00:30Z".into(),
+            entries: vec![
+                RevocationEntryV1 {
+                    subject_type: RevocationSubjectType::Policy,
+                    subject_id: "policy-digest".into(),
+                    status: RevocationStatus::Active,
+                    effective_at: "2026-11-17T10:00:00Z".into(),
+                    reason_code: None,
+                },
+                RevocationEntryV1 {
+                    subject_type: RevocationSubjectType::AttestationIssuer,
+                    subject_id: "issuer-1".into(),
+                    status: RevocationStatus::Active,
+                    effective_at: "2026-11-17T10:00:00Z".into(),
+                    reason_code: None,
+                },
+            ],
+            signing_key_id: "revocation-key-1".into(),
+        };
+        assert_eq!(
+            snapshot.validate_at("2026-11-17T10:00:10Z"),
+            Err(RevocationError::EntriesNotCanonical)
         );
     }
 
