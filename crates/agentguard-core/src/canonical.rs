@@ -86,8 +86,8 @@ pub fn hex_digest(digest: &[u8; 32]) -> String {
 
 #[cfg(test)]
 mod tests {
-    use serde::Serialize;
     use super::*;
+    use serde::Serialize;
 
     #[derive(Serialize)]
     struct ContainsFloat {
