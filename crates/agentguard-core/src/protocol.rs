@@ -605,12 +605,21 @@ mod tests {
         let mut message = b"AIVO-AGENTGUARD-SIGNING-CHALLENGE-V1\0".to_vec();
         message.extend_from_slice(&canonical);
         let signature = signing_key.sign(&message);
+        let signature_encoded = URL_SAFE_NO_PAD.encode(signature.to_bytes());
+        assert_eq!(
+            URL_SAFE_NO_PAD.encode(signing_key.verifying_key().to_bytes()),
+            "0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc"
+        );
+        assert_eq!(
+            signature_encoded,
+            "jZSZ6u2asrDn8FAaIm7UuNZxIcZTl1K6E08wpGHYs-H_M2pKpsnoV_CA-txgAH-8-DgGGcuqslebRP0dT_5UBg"
+        );
         let token = SignedSigningChallengeV1 {
             claims,
             signature: SignatureEnvelope {
                 algorithm: SignatureAlgorithm::Ed25519,
                 key_id: "permit-key-1".into(),
-                signature: URL_SAFE_NO_PAD.encode(signature.to_bytes()),
+                signature: signature_encoded,
             },
         };
         assert!(
