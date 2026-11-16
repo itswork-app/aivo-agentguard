@@ -11,6 +11,7 @@
 - `security/SECURITY-ARCHITECTURE-G2.md`: proposed security domains, trust boundaries, data flows, and failure behavior.
 - `security/KEY-MANAGEMENT-AND-CRYPTO-BOUNDARIES.md`: signer separation and key lifecycle requirements.
 - `security/THREAT-ANALYSIS-G2.md`: G2 threat register, abuse cases, and validation plan.
+- `security/G2-CONTROL-TRACEABILITY.md`: threat-to-control mapping and required proof artifacts.
 - `governance/PROJECT-GOVERNANCE.md`: maintainer authority, decision-making, and change controls.
 - `governance/LICENSE-DECISION.md`: approved Apache License 2.0 decision.
 - `governance/G1-SPECIFICATION-BASELINE.md`: G1 specification set and freeze criteria.
