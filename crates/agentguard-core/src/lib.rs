@@ -6,9 +6,14 @@
 mod canonical;
 mod crypto;
 mod protocol;
+mod revocation;
 
 pub use canonical::{CanonicalizationError, canonical_json, domain_digest, hex_digest};
 pub use crypto::{CryptoError, verify_ed25519};
+pub use revocation::{
+    RevocationEntryV1, RevocationError, RevocationHighWaterMark, RevocationSnapshotV1,
+    RevocationStatus, RevocationSubjectType, SignedRevocationSnapshotV1, validate_progression,
+};
 pub use protocol::{
     AttestationVerificationError, AuthorizationAttestationV1, ChallengeVerificationError,
     Decision, DecisionEventRef, EvidenceReceiptRef, KeyPurpose,
