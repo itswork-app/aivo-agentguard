@@ -14,8 +14,8 @@
    - DENY: no permit is issued.
    - REQUIRE_APPROVAL: no permit is issued; an approval workflow is started.
    - ALLOW: issue a signed, short-lived permit bound to the exact request.
-7. **Approve (if required):** authenticate eligible approvers, validate quorum and expiry, and append approval events.
-8. **Re-evaluate:** resolve fresh context and evaluate the current applicable policy again. Approval cannot override DENY or stale inputs.
+7. **Approve (if required):** authenticate eligible approvers, validate profile quorum, expiry, and separation-of-duties rules; append approval events.
+8. **Re-evaluate:** resolve fresh context and evaluate the currently active applicable policy again. If its digest differs from the policy digest to which approvals were bound, those approvals are invalid and a new approval cycle is required.
 9. **Enforce:** adapter verifies permit signature, key ID, expiry, exact action digest, tenant/principal/agent binding, policy digest, and context requirements; then atomically consumes the one-time permit ID before side effects.
 10. **Observe:** append the observed execution result or an explicit unknown outcome. Authorization success is not proof of execution success.
 
@@ -54,9 +54,9 @@ The permit binds the exact action digest and a short expiry. The adapter must re
 
 ## 6. Approval
 
-An approval record must be authenticated independently and bound to the same tenant, request ID, action digest, policy digest, approval profile, and expiry. Approval quorum and eligible roles are defined by the referenced approval profile. Duplicate approvals from the same principal do not count more than once unless a profile explicitly defines another mechanism.
+An approval record must be authenticated independently and bound to the same tenant, request ID, action digest, policy digest, approval profile and version, approver identity, and expiry. Approval quorum and eligible roles are defined by the referenced approval profile. Each approver counts once per request and profile. Separation-of-duties rules are enforced from trusted identity assertions.
 
-After quorum is satisfied, policy is evaluated again using current policy and fresh context. The new decision is authoritative. Approval never changes a DENY to ALLOW by itself.
+After quorum is satisfied, policy is evaluated again using current policy and fresh context. If the policy digest changed, the previous approval set cannot satisfy the new policy version. The new decision is authoritative. Approval never changes a DENY to ALLOW by itself.
 
 ## 7. Failure semantics
 
