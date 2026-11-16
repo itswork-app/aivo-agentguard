@@ -1,6 +1,6 @@
 //! Ed25519 verification primitives. No private-key/signing API is exposed.
 
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
+use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use ed25519_dalek::{Signature, VerifyingKey};
 use thiserror::Error;
 
@@ -38,23 +38,23 @@ pub fn verify_ed25519(
     envelope
         .validate_shape()
         .map_err(|_| CryptoError::InvalidEnvelope)?;
-    let key = VerifyingKey::from_bytes(public_key_bytes)
-        .map_err(|_| CryptoError::InvalidPublicKey)?;
+    let key =
+        VerifyingKey::from_bytes(public_key_bytes).map_err(|_| CryptoError::InvalidPublicKey)?;
     let signature_bytes = URL_SAFE_NO_PAD
         .decode(envelope.signature.as_bytes())
         .map_err(|_| CryptoError::InvalidSignatureEncoding)?;
     if signature_bytes.len() != 64 {
         return Err(CryptoError::InvalidSignatureLength);
     }
-    let signature = Signature::from_slice(&signature_bytes)
-        .map_err(|_| CryptoError::InvalidSignatureLength)?;
+    let signature =
+        Signature::from_slice(&signature_bytes).map_err(|_| CryptoError::InvalidSignatureLength)?;
     key.verify_strict(message, &signature)
         .map_err(|_| CryptoError::VerificationFailed)
 }
 
 #[cfg(test)]
 mod tests {
-    use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
+    use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
     use ed25519_dalek::{Signer, SigningKey};
 
     use super::*;
@@ -76,7 +76,11 @@ mod tests {
             Ok(())
         );
         assert_eq!(
-            verify_ed25519(signing_key.verifying_key().as_bytes(), &envelope, b"altered"),
+            verify_ed25519(
+                signing_key.verifying_key().as_bytes(),
+                &envelope,
+                b"altered"
+            ),
             Err(CryptoError::VerificationFailed)
         );
     }
