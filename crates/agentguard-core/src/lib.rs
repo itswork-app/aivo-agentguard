@@ -1,15 +1,50 @@
-//! Shared domain types for AIVO `AgentGuard`.
+//! Shared domain types and cryptographic protocol primitives for AIVO AgentGuard.
 //!
-//! This crate is scaffolding. Public contracts are provisional until their
-//! corresponding specifications are approved.
+//! This crate contains deterministic, side-effect-free primitives. It does not
+//! hold signing keys, perform authorization orchestration, or execute actions.
 
-/// Authorization outcomes at the policy boundary.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Decision {
-    /// The policy permits the exact action under the evaluated context.
-    Allow,
-    /// The policy prohibits the action or a required trust condition failed.
-    Deny,
-    /// A separate approval workflow is required; this is not execution permission.
-    RequireApproval,
+mod canonical;
+mod crypto;
+mod protocol;
+
+pub use canonical::{canonical_json, domain_digest, hex_digest, CanonicalizationError};
+pub use crypto::{verify_ed25519, CryptoError};
+pub use protocol::{Decision, KeyPurpose, SignatureEnvelope, SignatureAlgorithm, ProtocolShapeError};
+
+#[cfg(test)]
+mod tests {
+    use serde::Serialize;
+    use crate::{canonical_json, domain_digest, hex_digest};
+
+    #[derive(Serialize)]
+    struct ReorderedA { z: u64, a: &'static str }
+
+    #[derive(Serialize)]
+    struct ReorderedB { a: &'static str, z: u64 }
+
+    #[test]
+    fn canonical_json_is_independent_of_struct_field_order() {
+        let a = canonical_json(&ReorderedA { z: 7, a: "agent" }).unwrap();
+        let b = canonical_json(&ReorderedB { a: "agent", z: 7 }).unwrap();
+        assert_eq!(a, b);
+        assert_eq!(a, br#"{"a":"agent","z":7}"#);
+    }
+
+    #[test]
+    fn domain_digest_includes_exact_nul_terminated_domain() {
+        let payload = br#"{"action":"transfer"}"#;
+        let a = domain_digest(b"AIVO-AGENTGUARD-ACTION-V1\0", payload);
+        let b = domain_digest(b"AIVO-AGENTGUARD-REQUEST-V1\0", payload);
+        assert_ne!(a, b);
+        assert_eq!(hex_digest(&a).len(), 64);
+    }
+
+    #[test]
+    fn domain_separator_without_nul_is_not_equivalent() {
+        let payload = b"payload";
+        assert_ne!(
+            domain_digest(b"AIVO-AGENTGUARD-ACTION-V1\0", payload),
+            domain_digest(b"AIVO-AGENTGUARD-ACTION-V1", payload)
+        );
+    }
 }
