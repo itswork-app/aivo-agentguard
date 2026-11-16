@@ -155,16 +155,14 @@ impl RevocationSnapshotV1 {
 
 impl SignedRevocationSnapshotV1 {
     pub fn signing_message(&self) -> Result<Vec<u8>, CanonicalizationError> {
-        let canonical = canonical_json(&self.claims)
-            .map_err(|error| RevocationError::Canonicalization(error.to_string()))?;
+        let canonical = canonical_json(&self.claims)?;
         let mut message = b"AIVO-AGENTGUARD-REVOCATION-SNAPSHOT-V1\0".to_vec();
         message.extend_from_slice(&canonical);
         Ok(message)
     }
 
     pub fn digest(&self) -> Result<[u8; 32], CanonicalizationError> {
-        let canonical = canonical_json(self)
-            .map_err(|error| RevocationError::Canonicalization(error.to_string()))?;
+        let canonical = canonical_json(self)?;
         Ok(domain_digest(
             b"AIVO-AGENTGUARD-REVOCATION-SNAPSHOT-REF-V1\0",
             &canonical,
@@ -193,7 +191,11 @@ impl SignedRevocationSnapshotV1 {
             registry_id: self.claims.registry_id.clone(),
             registry_epoch: self.claims.registry_epoch,
             sequence: self.claims.sequence,
-            snapshot_digest: hex_digest(&self.digest()?),
+            snapshot_digest: hex_digest(
+                &self
+                    .digest()
+                    .map_err(|error| RevocationError::Canonicalization(error.to_string()))?,
+            ),
             this_update: self.claims.this_update.clone(),
         })
     }
