@@ -1,6 +1,6 @@
 # Permit Envelope v2
 
-**Status:** Proposed — G3 review required  
+**Status:** Approved — normative G3 v0.1.0  
 **Version:** 0.1.0  
 **Compatibility:** Wraps frozen G1 AuthorizationPermit v1 without changing its claims.
 
