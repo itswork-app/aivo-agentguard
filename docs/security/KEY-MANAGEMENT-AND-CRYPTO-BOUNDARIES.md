@@ -69,6 +69,10 @@ The policy evaluator must not possess signing private keys. The permit signer ac
 
 The signer must independently validate request shape, allowed key purpose, expiry ceiling, decision value, and digest binding. It must not accept arbitrary bytes from an agent.
 
+A bare runtime-supplied `ALLOW` field is insufficient. The signing request must include a cryptographically authenticated authorization attestation whose issuer is explicitly trusted by the signer and whose claims bind tenant, principal, agent, request, action digest, policy digest, context digest, decision, and durable decision-evidence reference. The signer verifies the attestation signature, issuer status, freshness, and exact claim equality before signing. The attestation design and issuer isolation are G3 contract work; until that contract is approved, no production signer may be implemented.
+
+Revocation checks must have a defined freshness bound. If the signer cannot establish sufficiently fresh status for the policy issuer, authorization-attestation issuer, or permit-signing key, it MUST fail closed. Offline or partitioned operation must not silently extend revocation freshness.
+
 ## 6. Threat controls
 
 - Use distinct service identities and access policies for policy and permit signing.
