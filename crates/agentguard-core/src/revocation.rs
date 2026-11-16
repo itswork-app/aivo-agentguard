@@ -89,7 +89,7 @@ pub enum RevocationError {
     #[error("revocation snapshot signature verification failed: {0}")]
     Crypto(#[from] CryptoError),
     #[error("revocation snapshot canonicalization failed: {0}")]
-    Canonicalization(#[from] CanonicalizationError),
+    Canonicalization(String),
     #[error("registry epoch changed without trusted out-of-band re-bootstrap")]
     EpochTransition,
     #[error("revocation snapshot sequence rollback")]
@@ -155,14 +155,16 @@ impl RevocationSnapshotV1 {
 
 impl SignedRevocationSnapshotV1 {
     pub fn signing_message(&self) -> Result<Vec<u8>, CanonicalizationError> {
-        let canonical = canonical_json(&self.claims)?;
+        let canonical = canonical_json(&self.claims)
+            .map_err(|error| RevocationError::Canonicalization(error.to_string()))?;
         let mut message = b"AIVO-AGENTGUARD-REVOCATION-SNAPSHOT-V1\0".to_vec();
         message.extend_from_slice(&canonical);
         Ok(message)
     }
 
     pub fn digest(&self) -> Result<[u8; 32], CanonicalizationError> {
-        let canonical = canonical_json(self)?;
+        let canonical = canonical_json(self)
+            .map_err(|error| RevocationError::Canonicalization(error.to_string()))?;
         Ok(domain_digest(
             b"AIVO-AGENTGUARD-REVOCATION-SNAPSHOT-REF-V1\0",
             &canonical,
@@ -179,7 +181,9 @@ impl SignedRevocationSnapshotV1 {
         {
             return Err(RevocationError::KeyIdMismatch);
         }
-        let message = self.signing_message()?;
+        let message = self
+            .signing_message()
+            .map_err(|error| RevocationError::Canonicalization(error.to_string()))?;
         verify_ed25519(public_key, &self.signature, &message)?;
         Ok(())
     }
