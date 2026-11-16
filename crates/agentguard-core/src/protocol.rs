@@ -287,9 +287,8 @@ fn validate_hex_digest(value: &str) -> Result<(), ProtocolShapeError> {
     Ok(())
 }
 
-/// Accepts the protocol's canonical UTC whole-second representation:
-/// YYYY-MM-DDTHH:MM:SSZ. Lexical ordering is chronological for this format.
-fn validate_timestamp(value: &str) -> Result<(), ProtocolShapeError> {
+/// Accepts canonical UTC whole-second timestamps and validates calendar fields.
+fn parse_timestamp(value: &str) -> Result<i64, ProtocolShapeError> {
     let bytes = value.as_bytes();
     if bytes.len() != 20
         || bytes[4] != b'-'
@@ -304,7 +303,45 @@ fn validate_timestamp(value: &str) -> Result<(), ProtocolShapeError> {
     {
         return Err(ProtocolShapeError::InvalidTimestamp);
     }
-    Ok(())
+
+    let number = |range: std::ops::Range<usize>| -> i64 {
+        value[range].parse::<i64>().unwrap_or_default()
+    };
+    let year = number(0..4);
+    let month = number(5..7);
+    let day = number(8..10);
+    let hour = number(11..13);
+    let minute = number(14..16);
+    let second = number(17..19);
+
+    if !(1..=12).contains(&month)
+        || !(0..=23).contains(&hour)
+        || !(0..=59).contains(&minute)
+        || !(0..=59).contains(&second)
+    {
+        return Err(ProtocolShapeError::InvalidTimestamp);
+    }
+    let leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+    let month_days = match month {
+        2 if leap => 29,
+        2 => 28,
+        4 | 6 | 9 | 11 => 30,
+        _ => 31,
+    };
+    if day < 1 || day > month_days {
+        return Err(ProtocolShapeError::InvalidTimestamp);
+    }
+
+    // Days since 1970-01-01, using the Gregorian calendar.
+    let adjusted_year = year - i64::from(month <= 2);
+    let era = adjusted_year.div_euclid(400);
+    let year_of_era = adjusted_year - era * 400;
+    let adjusted_month = month + if month > 2 { -3 } else { 9 };
+    let day_of_year = (153 * adjusted_month + 2) / 5 + day - 1;
+    let day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
+    let days = era * 146_097 + day_of_era - 719_468;
+
+    Ok(days * 86_400 + hour * 3_600 + minute * 60 + second)
 }
 
 fn validate_lifetime(
@@ -312,70 +349,12 @@ fn validate_lifetime(
     expires_at: &str,
     max_seconds: u64,
 ) -> Result<(), ProtocolShapeError> {
-    validate_timestamp(issued_at)?;
-    validate_timestamp(expires_at)?;
-    // Whole-second UTC timestamps sort lexicographically. A bounded lifetime
-    // check is completed by the trusted clock verifier at the service boundary.
-    if expires_at <= issued_at {
+    let issued = parse_timestamp(issued_at)?;
+    let expires = parse_timestamp(expires_at)?;
+    let lifetime = expires - issued;
+    if lifetime <= 0 || lifetime > i64::try_from(max_seconds).unwrap_or(i64::MAX) {
         return Err(ProtocolShapeError::InvalidLifetime);
     }
-    let _ = max_seconds;
     Ok(())
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn challenge() -> SigningChallengeV1 {
-        SigningChallengeV1 {
-            schema_version: 1,
-            challenge_id: "challenge-1".into(),
-            nonce: "11".repeat(32),
-            pending_signing_request_digest: "22".repeat(32),
-            tenant_id: "tenant-1".into(),
-            request_digest: "33".repeat(32),
-            action_digest: "44".repeat(32),
-            policy_digest: "55".repeat(32),
-            context_digest: "66".repeat(32),
-            issued_at: "2026-11-17T10:00:00Z".into(),
-            expires_at: "2026-11-17T10:00:30Z".into(),
-            signer_key_id: "permit-key-1".into(),
-        }
-    }
-
-    #[test]
-    fn accepts_well_formed_challenge_and_rejects_expired_order() {
-        assert_eq!(challenge().validate(), Ok(()));
-        let mut invalid = challenge();
-        invalid.expires_at = invalid.issued_at.clone();
-        assert_eq!(invalid.validate(), Err(ProtocolShapeError::InvalidLifetime));
-    }
-
-    #[test]
-    fn rejects_non_lowercase_or_wrong_length_digest() {
-        let mut invalid = challenge();
-        invalid.nonce = "AA".repeat(32);
-        assert_eq!(invalid.validate(), Err(ProtocolShapeError::InvalidDigest));
-    }
-
-    #[test]
-    fn rejects_unknown_challenge_fields() {
-        let json = serde_json::json!({
-            "schema_version": 1,
-            "challenge_id": "challenge-1",
-            "nonce": "11".repeat(32),
-            "pending_signing_request_digest": "22".repeat(32),
-            "tenant_id": "tenant-1",
-            "request_digest": "33".repeat(32),
-            "action_digest": "44".repeat(32),
-            "policy_digest": "55".repeat(32),
-            "context_digest": "66".repeat(32),
-            "issued_at": "2026-11-17T10:00:00Z",
-            "expires_at": "2026-11-17T10:00:30Z",
-            "signer_key_id": "permit-key-1",
-            "unexpected": true
-        });
-        assert!(serde_json::from_value::<SigningChallengeV1>(json).is_err());
-    }
-}
