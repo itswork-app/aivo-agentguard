@@ -6,9 +6,8 @@
 //! rollback-resistant checkpoint storage, and durable single-use consumption.
 
 use agentguard_core::{
-    KeyPurpose, PermitEnvelopeError, PermitEnvelopeV2, RevocationError,
-    RevocationHighWaterMarkStore, RevocationPersistenceError, RevocationSnapshotSource as _,
-    RevocationStatus, RevocationSubjectType, SignedRevocationSnapshotV1,
+    KeyPurpose, PermitEnvelopeError, PermitEnvelopeV2, RevocationHighWaterMarkStore,
+    RevocationPersistenceError, RevocationStatus, RevocationSubjectType, SignedRevocationSnapshotV1,
     persist_verified_snapshot,
 };
 use serde::{Deserialize, Serialize};
