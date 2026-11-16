@@ -17,12 +17,12 @@ AIVO AgentGuard is an open-source, Web3-first research and engineering project f
 
 ## Scope
 
-Initial focus: research, threat modeling, specifications, test design, and open-source core development. No deployment, capital allocation, token issuance, or live crypto transactions are in scope for the initial phase.
+Initial focus: research, threat modeling, specifications, test design, and core development. No deployment, capital allocation, token issuance, or live crypto transactions are in scope for the initial phase.
 
 ## Documentation
 
-Governance, architecture, security assumptions, specifications, and decision records will be maintained in `docs/`.
+See `docs/README.md` for the documentation index. Approved specifications and ADRs define intended behavior; documents marked Draft or Proposed are not frozen normative contracts.
 
 ## License
 
-The repository is being bootstrapped. The project license and contribution terms will be finalized in the governance bootstrap before external contributions are accepted.
+Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE). Contributions are submitted under the same license terms. The license does not grant rights to project trademarks or names.
