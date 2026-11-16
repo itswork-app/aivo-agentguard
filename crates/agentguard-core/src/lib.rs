@@ -1,4 +1,4 @@
-//! Shared domain types and cryptographic protocol primitives for AIVO `AgentGuard`.
+//! Shared domain types and cryptographic protocol primitives for AIVO \`AgentGuard\`.
 //!
 //! This crate contains deterministic, side-effect-free primitives. It does not
 //! hold signing keys, perform authorization orchestration, or execute actions.
@@ -10,7 +10,9 @@ mod protocol;
 pub use canonical::{CanonicalizationError, canonical_json, domain_digest, hex_digest};
 pub use crypto::{CryptoError, verify_ed25519};
 pub use protocol::{
-    Decision, KeyPurpose, ProtocolShapeError, SignatureAlgorithm, SignatureEnvelope,
+    AuthorizationAttestationV1, Decision, DecisionEventRef, EvidenceReceiptRef, KeyPurpose,
+    ProtocolShapeError, SignatureAlgorithm, SignatureEnvelope, SignedAuthorizationAttestationV1,
+    SignedSigningChallengeV1, SigningChallengeV1,
 };
 
 #[cfg(test)]
@@ -19,16 +21,9 @@ mod tests {
     use serde::Serialize;
 
     #[derive(Serialize)]
-    struct ReorderedA {
-        z: u64,
-        a: &'static str,
-    }
-
+    struct ReorderedA { z: u64, a: &'static str }
     #[derive(Serialize)]
-    struct ReorderedB {
-        a: &'static str,
-        z: u64,
-    }
+    struct ReorderedB { a: &'static str, z: u64 }
 
     #[test]
     fn canonical_json_is_independent_of_struct_field_order() {
