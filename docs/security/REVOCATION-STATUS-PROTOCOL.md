@@ -1,6 +1,6 @@
 # Revocation Status Protocol
 
-**Status:** Proposed — G3 review required  
+**Status:** Approved — normative G3 v0.1.0  
 **Version:** 0.1.0
 
 ## 1. Purpose and scope
