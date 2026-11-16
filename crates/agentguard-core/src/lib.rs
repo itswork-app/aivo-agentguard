@@ -57,7 +57,10 @@ mod tests {
         let a = domain_digest(b"AIVO-AGENTGUARD-ACTION-V1\0", payload);
         let b = domain_digest(b"AIVO-AGENTGUARD-REQUEST-V1\0", payload);
         assert_ne!(a, b);
-        assert_eq!(hex_digest(&a).len(), 64);
+        assert_eq!(
+            hex_digest(&a),
+            "2067ea88cc6825da0bf23d7586b49b1f8eb46ae7c7e8cb06803f68b0cbb052ca"
+        );
     }
 
     #[test]
