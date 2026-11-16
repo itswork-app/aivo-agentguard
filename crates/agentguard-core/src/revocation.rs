@@ -14,6 +14,7 @@ use crate::{
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum RevocationStatus {
     Active,
+    Suspended,
     Retired,
     Revoked,
     Compromised,
@@ -23,6 +24,7 @@ pub enum RevocationStatus {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum RevocationSubjectType {
+    PolicyIssuer,
     PolicyIssuerKey,
     Policy,
     AttestationIssuer,
@@ -65,6 +67,7 @@ pub struct SignedRevocationSnapshotV1 {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RevocationHighWaterMark {
+    pub registry_id: String,
     pub registry_epoch: u64,
     pub sequence: u64,
     pub snapshot_digest: String,
@@ -102,6 +105,8 @@ impl RevocationSnapshotV1 {
         if self.schema_version != 1
             || self.registry_id.is_empty()
             || self.registry_id.trim() != self.registry_id
+            || self.registry_epoch == 0
+            || self.sequence == 0
             || self.signing_key_id.is_empty()
             || self.signing_key_id.trim() != self.signing_key_id
             || self.entries.is_empty()
@@ -181,6 +186,7 @@ impl SignedRevocationSnapshotV1 {
 
     pub fn high_water_mark(&self) -> Result<RevocationHighWaterMark, RevocationError> {
         Ok(RevocationHighWaterMark {
+            registry_id: self.claims.registry_id.clone(),
             registry_epoch: self.claims.registry_epoch,
             sequence: self.claims.sequence,
             snapshot_digest: hex_digest(&self.digest()?),
@@ -201,7 +207,9 @@ pub fn validate_progression(
     let Some(previous) = previous else {
         return Ok(true);
     };
-    if candidate.registry_epoch != previous.registry_epoch {
+    if candidate.registry_id != previous.registry_id
+        || candidate.registry_epoch != previous.registry_epoch
+    {
         return Err(RevocationError::EpochTransition);
     }
     if candidate.sequence < previous.sequence {
@@ -279,6 +287,7 @@ mod tests {
 
     fn mark(epoch: u64, sequence: u64, digest: &str, updated: &str) -> RevocationHighWaterMark {
         RevocationHighWaterMark {
+            registry_id: "registry-1".into(),
             registry_epoch: epoch,
             sequence,
             snapshot_digest: digest.into(),
