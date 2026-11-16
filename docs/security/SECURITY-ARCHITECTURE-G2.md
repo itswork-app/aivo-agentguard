@@ -47,6 +47,7 @@ Define the security architecture that implements the approved G1 authorization c
 
 Distinct key purposes:
 - Policy issuer signing key.
+- Authorization-attestation issuer key, held outside the runtime coordinator and permit signer.
 - Permit signing key.
 - Optional evidence checkpoint signing key.
 - Context source attestation keys (owned by external providers).
