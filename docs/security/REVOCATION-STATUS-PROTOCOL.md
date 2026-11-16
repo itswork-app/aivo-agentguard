@@ -49,7 +49,7 @@ A snapshot contains:
 
 Each entry contains `subject_type`, `subject_id`, `status`, `effective_at`, and optional `reason_code`. For a current snapshot, `effective_at` MUST be no later than `this_update`; scheduled future status transitions are not supported in v1. Raw secrets or personal details MUST NOT appear in status entries.
 
-The snapshot signature is Ed25519 over canonical snapshot fields excluding signature, prefixed with `AIVO-AGENTGUARD-REVOCATION-SNAPSHOT-V1\\0`. Revocation authority keys are provisioned out-of-band and MUST be separate from all keys whose status they publish.
+The snapshot signature is Ed25519 over canonical snapshot fields excluding signature, prefixed with `AIVO-AGENTGUARD-REVOCATION-SNAPSHOT-V1\0`. Revocation authority keys are provisioned out-of-band and MUST be separate from all keys whose status they publish.
 
 ## 4. Freshness and rollback rules
 
@@ -63,11 +63,12 @@ Consumers MUST verify:
 - `now <= next_update`;
 - `now - this_update <= 30 seconds` (exactly 30 seconds is accepted; any greater age is rejected);
 - `next_update - this_update <= 60 seconds`;
-- sequence is not lower than the highest previously accepted sequence for the registry epoch;
+- each newly accepted snapshot sequence is strictly greater than the persisted high-water mark; an exact duplicate sequence may be treated as an idempotent replay only when its canonical snapshot digest exactly matches the previously accepted digest; same-sequence/different-digest snapshots are rejected;
+- `this_update` is not earlier than the previously accepted snapshot's `this_update` within the same epoch;
 - registry epoch is trusted and cannot be reset by an untrusted response;
-- all required subjects have explicit entries or are explicitly covered by a signed registry policy that defines default status. Missing status is UNKNOWN and fails closed.
+- every required subject has an explicit exact-match entry in the signed snapshot. Wildcard, prefix, or implicit default entries are not supported in v1. Missing status is UNKNOWN and fails closed.
 
-A consumer MUST persist the highest accepted sequence and epoch in rollback-resistant storage. If that state is lost, rolled back, or cannot be verified, the consumer MUST stop enforcement until re-bootstrap from an out-of-band trusted checkpoint. Clock uncertainty beyond the configured 5-second skew fails closed.
+A consumer MUST persist the highest accepted registry epoch, sequence, canonical snapshot digest, and `this_update` in rollback-resistant storage. If that state is lost, rolled back, or cannot be verified, the consumer MUST stop enforcement until re-bootstrap from an out-of-band trusted checkpoint. Clock uncertainty beyond the configured 5-second skew fails closed.
 
 ## 5. Required lookup set
 
