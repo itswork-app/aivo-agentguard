@@ -49,10 +49,18 @@ impl SignatureEnvelope {
     /// Returns an error when the key identifier is empty/whitespace-padded or
     /// the signature string is empty.
     pub fn validate_shape(&self) -> Result<(), ProtocolShapeError> {
-        if self.key_id.is_empty() || self.key_id.trim() != self.key_id {
+        if self.key_id.is_empty()
+            || self.key_id.len() > 256
+            || self.key_id.trim() != self.key_id
+        {
             return Err(ProtocolShapeError::InvalidKeyId);
         }
-        if self.signature.is_empty() {
+        if self.signature.len() != 86
+            || !self
+                .signature
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
+        {
             return Err(ProtocolShapeError::EmptySignature);
         }
         Ok(())
@@ -724,6 +732,29 @@ mod tests {
             "unexpected": true
         });
         assert!(serde_json::from_value::<SigningChallengeV1>(json).is_err());
+    }
+
+    #[test]
+    fn signature_envelope_rejects_noncanonical_base64url_length_and_characters() {
+        let invalid_length = SignatureEnvelope {
+            algorithm: SignatureAlgorithm::Ed25519,
+            key_id: "permit-key-1".into(),
+            signature: "A".repeat(85),
+        };
+        assert_eq!(
+            invalid_length.validate_shape(),
+            Err(ProtocolShapeError::EmptySignature)
+        );
+
+        let invalid_character = SignatureEnvelope {
+            algorithm: SignatureAlgorithm::Ed25519,
+            key_id: "permit-key-1".into(),
+            signature: format!("{}=", "A".repeat(85)),
+        };
+        assert_eq!(
+            invalid_character.validate_shape(),
+            Err(ProtocolShapeError::EmptySignature)
+        );
     }
 
     #[test]
