@@ -2,7 +2,7 @@
 
 Deterministic authorization infrastructure for autonomous agents.
 
-AIVO AgentGuard is an open-source, Web3-first research and engineering project focused on policy-based authorization of agent actions across execution environments.
+AIVO AgentGuard is an intended open-source, Web3-first research and engineering project focused on policy-based authorization of agent actions across execution environments.
 
 > **Project status:** Research and specification phase. Not production-ready. Do not use to authorize real funds, sign transactions, or protect production systems.
 
@@ -17,7 +17,7 @@ AIVO AgentGuard is an open-source, Web3-first research and engineering project f
 
 ## Scope
 
-Initial focus: research, threat modeling, specifications, test design, and open-source core development. No deployment, capital allocation, token issuance, or live crypto transactions are in scope for the initial phase.
+Initial focus: research, threat modeling, specifications, test design, and core development. Open-source distribution is the target model; the license remains pending maintainer approval. No deployment, capital allocation, token issuance, or live crypto transactions are in scope for the initial phase.
 
 ## Documentation
 
