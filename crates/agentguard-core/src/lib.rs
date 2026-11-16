@@ -10,7 +10,8 @@ mod protocol;
 pub use canonical::{CanonicalizationError, canonical_json, domain_digest, hex_digest};
 pub use crypto::{CryptoError, verify_ed25519};
 pub use protocol::{
-    AuthorizationAttestationV1, Decision, DecisionEventRef, EvidenceReceiptRef, KeyPurpose,
+    AttestationVerificationError, AuthorizationAttestationV1, ChallengeVerificationError,
+    Decision, DecisionEventRef, EvidenceReceiptRef, KeyPurpose,
     ProtocolShapeError, SignatureAlgorithm, SignatureEnvelope, SignedAuthorizationAttestationV1,
     SignedSigningChallengeV1, SigningChallengeV1,
 };
