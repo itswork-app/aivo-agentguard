@@ -28,7 +28,7 @@ G3 is a protocol/specification gate. It does not implement runtime signing, enfo
 1. Authorization-attestation issuer is a separate trust boundary from runtime coordinator and permit signer.
 2. Attestation issuer independently validates all input provenance and independently recomputes the deterministic decision; runtime ALLOW assertion is never sufficient.
 3. Attestation binds authenticated identities, request/action/policy/context digests, evaluator semantic and artifact versions, durable decision evidence, and a single-use challenge nonce.
-4. PermitEnvelopeV2 binds frozen G1 permit, attestation, policy issuer/key provenance, and permit-envelope signature.
+4. PermitEnvelopeV2 binds frozen G1 permit, attestation, policy issuer/key provenance, and permit-envelope signature; both inner and outer permit-signing keys are checked.
 5. Enforcement independently verifies all signatures and exact bindings.
 6. Revocation snapshots are signed by a separate revocation authority, monotonic, rollback-resistant, and bounded to 30-second maximum age with 60-second maximum snapshot validity.
 7. Required revocation status is checked at signing and immediately before permit consumption; unknown, stale, unavailable, revoked, compromised, or rolled-back status fails closed.
@@ -41,6 +41,7 @@ G3 is a protocol/specification gate. It does not implement runtime signing, enfo
 - `specifications/PERMIT-ENVELOPE-V2.md`
 - `security/REVOCATION-STATUS-PROTOCOL.md`
 - `testing/G3-ACCEPTANCE-TEST-PLAN.md`
+- `testing/G3-TRACEABILITY.md`
 - ADR-0008: authorization attestation and verifier isolation.
 - ADR-0009: permit envelope v2 and revocation status.
 
