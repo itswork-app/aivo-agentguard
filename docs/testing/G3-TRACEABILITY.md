@@ -15,7 +15,7 @@
 | G3-PER-003 G3 enforcement rejects standalone G1 v1 permit | Permit Envelope v2; ADR-0009 | Downgrade/legacy-profile negative tests |
 | G3-REV-001 Revocation snapshots are signed by a distinct authority | Revocation Status Protocol; ADR-0009 | Invalid signature and trust-root tests |
 | G3-REV-002 Snapshot freshness, sequence, epoch, and rollback are enforced | Revocation Status Protocol | Age boundary, stale, rollback, lost high-water mark tests |
-| G3-REV-003 All required keys, issuers, and exact policy version/digest are checked | Revocation Status Protocol; Permit Envelope v2 | Revoke-after-issue-before-consume tests |
+| G3-REV-003 Both inner and outer permit keys, all issuers, and exact policy version/digest are checked | Revocation Status Protocol; Permit Envelope v2 | Revoke-after-issue-before-consume tests |
 | G3-REV-004 Missing, stale, unknown, or unavailable status fails closed | Revocation Status Protocol | Network partition, cache expiry, missing entry tests |
 | G3-ENF-001 All verification precedes consume; consume precedes side effect | Permit Envelope v2; ADR-0007 | Side-effect counter remains zero on every failed check |
 | G3-ENF-002 Consume is tenant-scoped and linearizable across replicas | ADR-0007; G3 Acceptance Test Plan | Concurrent multi-replica and cross-tenant collision tests |
