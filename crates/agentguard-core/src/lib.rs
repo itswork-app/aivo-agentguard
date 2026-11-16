@@ -5,8 +5,8 @@
 
 mod canonical;
 mod crypto;
-mod protocol;
 mod permit;
+mod protocol;
 mod revocation;
 
 pub use canonical::{CanonicalizationError, canonical_json, domain_digest, hex_digest};
