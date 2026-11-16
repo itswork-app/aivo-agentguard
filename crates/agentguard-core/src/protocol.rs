@@ -314,9 +314,15 @@ impl SignedAuthorizationAttestationV1 {
     }
 
     /// Verify the attestation signature using a caller-resolved issuer-purpose key.
-    pub fn verify_signature(&self, public_key: &[u8; 32]) -> Result<(), AttestationVerificationError> {
-        self.validate_shape().map_err(AttestationVerificationError::InvalidShape)?;
-        let message = self.signing_message().map_err(AttestationVerificationError::Canonicalization)?;
+    pub fn verify_signature(
+        &self,
+        public_key: &[u8; 32],
+    ) -> Result<(), AttestationVerificationError> {
+        self.validate_shape()
+            .map_err(AttestationVerificationError::InvalidShape)?;
+        let message = self
+            .signing_message()
+            .map_err(AttestationVerificationError::Canonicalization)?;
         verify_ed25519(public_key, &self.signature, &message)
             .map_err(AttestationVerificationError::Crypto)
     }
@@ -460,4 +466,3 @@ fn validate_lifetime(
     }
     Ok(())
 }
-
