@@ -430,8 +430,6 @@ pub enum AttestationVerificationError {
     #[error("attestation signature verification failed: {0}")]
     Crypto(#[from] crate::CryptoError),
 }
-
-
 /// Exact values the challenge replay store must atomically bind and consume.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
