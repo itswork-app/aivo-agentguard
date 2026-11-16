@@ -369,7 +369,10 @@ mod tests {
     #[test]
     fn missing_trusted_bootstrap_checkpoint_fails_closed() {
         assert_eq!(
-            validate_progression(None, &mark(2, 1, &&"aa".repeat(32).repeat(32), "2026-11-17T10:00:00Z")),
+            validate_progression(
+                None,
+                &mark(2, 1, &"aa".repeat(32), "2026-11-17T10:00:00Z")
+            ),
             Err(RevocationError::InvalidShape)
         );
     }
@@ -395,11 +398,17 @@ mod tests {
     fn rollback_and_untrusted_epoch_change_are_rejected() {
         let prior = mark(2, 7, &"aa".repeat(32), "2026-11-17T10:00:00Z");
         assert_eq!(
-            validate_progression(Some(&prior), &mark(2, 6, &"bb".repeat(32), "2026-11-17T10:00:00Z")),
+            validate_progression(
+                Some(&prior),
+                &mark(2, 6, &"bb".repeat(32), "2026-11-17T10:00:00Z")
+            ),
             Err(RevocationError::SequenceRollback)
         );
         assert_eq!(
-            validate_progression(Some(&prior), &mark(3, 8, &"cc".repeat(32), "2026-11-17T10:00:01Z")),
+            validate_progression(
+                Some(&prior),
+                &mark(3, 8, &"cc".repeat(32), "2026-11-17T10:00:01Z")
+            ),
             Err(RevocationError::EpochTransition)
         );
     }
