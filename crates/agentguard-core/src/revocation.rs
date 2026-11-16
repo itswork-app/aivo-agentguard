@@ -101,6 +101,12 @@ pub enum RevocationError {
 }
 
 impl RevocationSnapshotV1 {
+    /// Validate schema, canonical ordering, and bounded freshness against trusted UTC time.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for malformed snapshots, invalid subjects, unsorted entries,
+    /// stale/future timestamps, or timestamps outside the allowed skew.
     pub fn validate_at(&self, now_utc: &str) -> Result<(), RevocationError> {
         if self.schema_version != 1
             || self.registry_id.is_empty()
@@ -154,6 +160,11 @@ impl RevocationSnapshotV1 {
 }
 
 impl SignedRevocationSnapshotV1 {
+    /// Build the exact domain-separated message signed by the revocation authority.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if canonical JSON serialization fails.
     pub fn signing_message(&self) -> Result<Vec<u8>, CanonicalizationError> {
         let canonical = canonical_json(&self.claims)?;
         let mut message = b"AIVO-AGENTGUARD-REVOCATION-SNAPSHOT-V1\0".to_vec();
@@ -161,6 +172,11 @@ impl SignedRevocationSnapshotV1 {
         Ok(message)
     }
 
+    /// Compute the canonical digest of the complete signed snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if canonical JSON serialization fails.
     pub fn digest(&self) -> Result<[u8; 32], CanonicalizationError> {
         let canonical = canonical_json(self)?;
         Ok(domain_digest(
@@ -169,6 +185,12 @@ impl SignedRevocationSnapshotV1 {
         ))
     }
 
+    /// Verify freshness, signature key binding, and Ed25519 signature.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid snapshot shape, stale status, key mismatch,
+    /// canonicalization failure, or signature verification failure.
     pub fn verify_at(&self, public_key: &[u8; 32], now_utc: &str) -> Result<(), RevocationError> {
         self.claims.validate_at(now_utc)?;
         self.signature
@@ -186,6 +208,11 @@ impl SignedRevocationSnapshotV1 {
         Ok(())
     }
 
+    /// Derive the rollback-protection checkpoint for this signed snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if canonical digest generation fails.
     pub fn high_water_mark(&self) -> Result<RevocationHighWaterMark, RevocationError> {
         Ok(RevocationHighWaterMark {
             registry_id: self.claims.registry_id.clone(),
@@ -206,6 +233,11 @@ impl SignedRevocationSnapshotV1 {
 /// Exact same-sequence/same-digest replay is idempotent. Registry epoch changes
 /// require a separate trusted recovery/bootstrap operation and are never
 /// accepted through an ordinary snapshot update.
+///
+/// # Errors
+///
+/// Returns an error for registry/epoch changes, sequence rollback, same-sequence
+/// equivocation, or update-time rollback.
 pub fn validate_progression(
     previous: Option<&RevocationHighWaterMark>,
     candidate: &RevocationHighWaterMark,
