@@ -40,7 +40,8 @@ Define the security architecture that implements the approved G1 authorization c
 - The permit signer MUST NOT treat an unauthenticated runtime assertion such as `decision = ALLOW` as proof of authorization. Before signing, it must verify a cryptographically authenticated authorization attestation bound to the exact tenant, principal, agent, request, action digest, policy digest, context digest, decision, and durable decision-evidence reference. The attestation issuer must be a distinct trust boundary from the runtime coordinator and permit signer; it must independently validate the deterministic decision and its exact input/evidence binding rather than merely signing a runtime assertion. A runtime compromise must not silently become signing authority. The concrete proof/validation contract is a G3 prerequisite.
 - The signer MUST verify attestation freshness and current issuer/key revocation state. If revocation state is unavailable or exceeds its configured freshness bound, signing fails closed.
 - Enforcement must not trust a permit merely because it was returned by an in-process function; signature, claims, expiry, and single-use state are verified at the boundary.
-- At permit consumption, enforcement MUST check current revocation status for the permit-signing key and the authorization-attestation issuer, using an explicitly bounded freshness window. If status is revoked, compromised, unknown, unavailable, or stale, the permit is rejected and no side effect occurs. A permit's short TTL does not replace this check.
+- At permit consumption, enforcement MUST establish fresh, bounded revocation status for (a) the permit-signing key, (b) the authorization-attestation issuer and attestation, and (c) the policy issuer and policy version/digest. Revoked, compromised, unknown, unavailable, or stale status MUST reject the permit before any side effect. A permit's short TTL does not replace these checks.
+- **G3 permit-binding prerequisite:** the frozen G1 v1 permit claims do not identify the authorization-attestation issuer or carry an attestation reference. G3 MUST define a versioned, cryptographically verifiable binding (for example, issuer ID/key ID plus attestation digest/reference in the permit or an authenticated envelope) and a trusted way to resolve the policy issuer and current policy-revocation status. This is a G3 contract extension; G1 v0.1.0 MUST NOT be silently modified. Until that binding and its verification are specified and tested, enforcement MUST fail closed and production enforcement is prohibited.
 - Tenant identity is derived from authenticated identity context, never from an untrusted action payload.
 - Every adapter must document bypass paths and external side-effect semantics.
 
@@ -64,7 +65,7 @@ Untrusted action → identity assertion → normalized request → context snaps
 REQUIRE_APPROVAL → approval request → independent approver authentication → action/policy-bound approval event → quorum verification → fresh context → fresh policy evaluation → decision.
 
 ### Enforcement
-Permit + actual action → signature/claim verification → atomic single-use consume → protected side effect → observed outcome evidence.
+Permit + actual action → signature/claim verification → current policy/key/issuer revocation verification → atomic single-use consume → protected side effect → observed outcome evidence.
 
 ## 7. Failure and availability
 
@@ -74,7 +75,8 @@ All security-critical dependencies fail closed:
 - Context source unavailable or stale: reject when policy requires it.
 - Evidence append unavailable: do not issue ALLOW permit.
 - Permit signing unavailable: do not issue permit.
-- Permit consume store unavailable: do not execute.
+- Permit consume store unavailable or unable to provide the required cross-replica atomicity: do not execute.
+- Policy, attestation, or signing-key revocation status unavailable, unknown, or stale: do not execute.
 - Unknown schema, algorithm, key ID, or version: reject.
 
 Availability objectives and retry policies are deferred until a concrete deployment topology is selected. Retries must not duplicate side effects.
@@ -100,5 +102,5 @@ Compromised host, root operator, adapter bypass, dishonest context provider, sto
 - Threat scenarios mapped to mitigations and tests.
 - Enforcement and replay guarantees precisely scoped.
 - Privacy, tenancy, and evidence integrity reviewed.
-- Independent security reviewer feedback addressed.
+- Review findings addressed and G3 prerequisites explicitly recorded.
 - No deployment or production-readiness claim until later gates are met.
