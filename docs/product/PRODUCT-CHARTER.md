@@ -53,4 +53,3 @@ A reviewer can understand the threat model, reproduce policy decisions from vers
 - Which Web3 agent frameworks and execution surfaces should be first-class adapters?
 - What is the minimal approval identity and quorum model?
 - Which evidence integrity format best supports offline verification?
-- Which license and contribution agreement should govern the project?
