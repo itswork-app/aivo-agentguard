@@ -30,9 +30,9 @@ No unknown fields are accepted. The inner permit must have `decision = ALLOW`. T
 
 ## 3. Digests and signatures
 
-The attestation digest is SHA-256 over the attestation's canonical signed payload and signature envelope, prefixed with `AIVO-AGENTGUARD-ATTESTATION-REF-V1\\0`.
+The attestation digest is SHA-256 over the attestation's canonical signed payload and signature envelope, prefixed with `AIVO-AGENTGUARD-ATTESTATION-REF-V1\0`.
 
-The envelope signature is Ed25519 over canonical envelope fields excluding `envelope_signature`, prefixed with `AIVO-AGENTGUARD-PERMIT-ENVELOPE-V2\\0`. The envelope signer key MUST have permit-envelope signing purpose. It MUST be distinct from policy issuer, authorization-attestation issuer, evidence service, and context-source keys. The frozen inner G1 permit signature is verified independently; the outer signature does not replace it.
+The envelope signature is Ed25519 over canonical envelope fields excluding `envelope_signature`, prefixed with `AIVO-AGENTGUARD-PERMIT-ENVELOPE-V2\0`. The envelope signer key MUST have permit-envelope signing purpose. It MUST be distinct from policy issuer, authorization-attestation issuer, evidence service, and context-source keys. The frozen inner G1 permit signature is verified independently; the outer signature does not replace it.
 
 All canonicalization uses the G1 RFC 8785 and numeric restrictions. Algorithm negotiation is prohibited. Unknown schema versions or key purposes are rejected.
 
