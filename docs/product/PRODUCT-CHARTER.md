@@ -1,6 +1,6 @@
 # Product Charter
 
-**Status:** Draft — G0 bootstrap  
+**Status:** Superseded — historical G0 bootstrap charter; normative product requirements are maintained in PRD-001 v0.1.0.
 **Product:** AIVO AgentGuard
 
 ## Mission

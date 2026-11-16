@@ -1,6 +1,6 @@
 # Requirements Traceability
 
-**Status:** Proposed — G1 product-owner review required
+**Status:** Approved — product owner accepted 2026-11-16
 
 | Requirement | Specification | Acceptance coverage |
 |---|---|---|

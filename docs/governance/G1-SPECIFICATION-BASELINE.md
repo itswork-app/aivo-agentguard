@@ -1,14 +1,14 @@
 # G1 Specification Baseline
 
-**Status:** Proposed — product-owner approval required  
+**Status:** Approved — product owner accepted 2026-11-16  
 **Baseline:** 0.1.0  
 **Date:** 2026-11-16
 
 ## Purpose
 
-G1 turns the G0 product and architecture direction into a coherent, testable contract set. This baseline is proposed for approval; it is not frozen until the product owner explicitly accepts it and the PR is merged.
+G1 turns the G0 product and architecture direction into a coherent, testable contract set. The product owner approved this baseline on 2026-11-16. It was merged to main in PR #3 at commit `62b7becf3c82110f5d737d7aa850f43483fed1d7` and is frozen as the G1 v0.1.0 reference.
 
-## Normative decisions proposed
+## Frozen normative decisions
 
 1. Rust is the authoritative deterministic policy core.
 2. Authorization decisions are exactly ALLOW, DENY, and REQUIRE_APPROVAL.
@@ -33,12 +33,12 @@ G1 turns the G0 product and architecture direction into a coherent, testable con
 - EVIDENCE-FORMAT: event envelope and integrity.
 - API-CONTRACT-V1: transport-neutral API surface.
 - SECURITY-REQUIREMENTS: security invariants.
-- ADR-0002 through ADR-0005: policy combining, canonicalization, evidence, and approval/permit decisions.
+- ADR-0001 through ADR-0005: deterministic authorization core, policy combining, canonicalization, evidence, and approval/permit decisions.
 - ACCEPTANCE-TEST-PLAN and REQUIREMENTS-TRACEABILITY: verification plan.
 
 ## Freeze criteria
 
-G1 may be marked Approved only when:
+The G1 approval criteria were satisfied at merge:
 - all documents agree on terminology, status, and decision semantics;
 - every MUST requirement maps to an acceptance test;
 - all unresolved security-critical questions are either decided or explicitly deferred with a safe default;

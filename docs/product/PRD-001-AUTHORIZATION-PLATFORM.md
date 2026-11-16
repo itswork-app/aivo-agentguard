@@ -1,6 +1,6 @@
 # PRD-001: Agent Authorization Platform
 
-**Status:** Proposed — G1 product-owner review required  
+**Status:** Approved — product owner accepted 2026-11-16  
 **Version:** 0.1.0  
 **Date:** 2026-11-16  
 **Audience:** Web3 infrastructure teams, autonomous-agent builders, security engineers

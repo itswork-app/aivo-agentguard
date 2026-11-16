@@ -1,6 +1,6 @@
 # Policy Schema and Evaluation Semantics
 
-**Status:** Proposed — G1 product-owner review required  
+**Status:** Approved — product owner accepted 2026-11-16  
 **Version:** 0.1.0
 
 ## 1. Design constraints

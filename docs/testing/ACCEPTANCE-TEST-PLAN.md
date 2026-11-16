@@ -1,6 +1,6 @@
 # Acceptance Test Plan — G1 Contract
 
-**Status:** Proposed — G1 product-owner review required
+**Status:** Approved — product owner accepted 2026-11-16
 
 ## 1. Test principles
 
