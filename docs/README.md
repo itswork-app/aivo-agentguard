@@ -15,6 +15,7 @@
 - `security/G2-ADVERSARIAL-REVIEW.md`: findings, dispositions, limitations, and conditional merge recommendation from the G2 adversarial review.
 - `security/G3-AUTHORIZATION-ATTESTATION.md`: independent deterministic verification and signed authorization-attestation protocol.
 - `security/REVOCATION-STATUS-PROTOCOL.md`: signed, monotonic, bounded-freshness revocation snapshots.
+- `security/G3-ADVERSARIAL-REVIEW.md`: AI-assisted specification review, findings, remediations, and limitations.
 - `governance/PROJECT-GOVERNANCE.md`: maintainer authority, decision-making, and change controls.
 - `governance/LICENSE-DECISION.md`: approved Apache License 2.0 decision.
 - `governance/G1-SPECIFICATION-BASELINE.md`: G1 specification set and freeze criteria.
