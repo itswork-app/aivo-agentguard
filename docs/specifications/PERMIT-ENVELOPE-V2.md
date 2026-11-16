@@ -20,7 +20,7 @@ The canonical `PermitEnvelopeV2` contains exactly:
 - `authorization_attestation_v1`: complete G3 attestation payload and signature
 - `policy_provenance`: `policy_id`, `policy_version`, `policy_digest`, `policy_issuer_id`, `policy_signing_key_id`
 - `attestation_binding`: `issuer_id`, `issuer_key_id`, `attestation_digest`
-- `permit_signer_key_id`: purpose-specific permit-envelope signing key
+- `permit_signer_key_id`: purpose-specific permit-envelope signing key; may equal or differ from the inner G1 permit `signing_key_id`, but both keys MUST have permit-signing purpose and both are independently checked for revocation
 - `issued_at`
 - `expires_at`
 - `envelope_signature`: Ed25519 signature over all preceding envelope fields
@@ -45,9 +45,9 @@ The following fields MUST match exactly across inner permit, attestation, and en
 - decision `ALLOW`;
 - issue/expiry bounds.
 
-The policy issuer ID and policy signing key ID in the attestation and envelope MUST match the verified policy signature metadata. The attestation issuer ID/key ID in the binding MUST match the attestation's signed claims and verified signature. The attestation digest MUST be recomputed by the consumer; caller-supplied digest values are never trusted.
+The policy issuer ID and policy signing key ID in the attestation and envelope MUST match the verified policy signature metadata. The inner G1 `signing_key_id` and outer `permit_signer_key_id` may be the same key or two distinct keys of the same permit-signing purpose; the consumer MUST verify both signatures and both key statuses. The attestation issuer ID/key ID in the binding MUST match the attestation's signed claims and verified signature. The attestation digest MUST be recomputed by the consumer; caller-supplied digest values are never trusted.
 
-The envelope signature covers the attestation bytes/reference, policy provenance, and inner permit signature, preventing substitution after signing.
+The envelope signature covers the attestation bytes/reference, policy provenance, and inner permit signature, preventing substitution after signing. Challenge issue precedes attestation issue; attestation issue MUST be no later than inner permit issue; inner permit issue MUST be no later than envelope issue. The envelope and inner permit must share the exact tenant/request/action/policy/context claims.
 
 ## 5. Enforcement verification order
 
@@ -55,14 +55,15 @@ The enforcement boundary MUST perform these checks before consuming the permit a
 
 1. Enforce configured envelope version and strict schema.
 2. Verify the outer envelope signature and permit-envelope key purpose.
-3. Verify the inner G1 permit signature and all G1 claims.
-4. Recompute and verify the attestation digest and attestation signature.
-5. Verify exact field equality across all bindings.
-6. Verify trusted, fresh revocation status for permit signer, attestation issuer/key, policy issuer/key, and policy ID/version/digest.
-7. Verify time bounds using trusted enforcement time and configured clock-skew rules.
-8. Verify actual action digest and authenticated tenant/principal/agent match.
-9. Atomically consume tenant-scoped permit identity using the G2 linearizable consume invariant.
-10. Only after successful consumption may the adapter initiate the protected side effect.
+3. Verify the inner G1 permit signature and all G1 claims; verify its `signing_key_id` independently from the outer envelope key ID.
+4. Verify timestamp ordering: challenge issue precedes attestation issue; attestation issue is no later than inner permit issue; inner permit issue is no later than envelope issue; all expiry bounds are monotonic and not exceeded.
+5. Recompute and verify the attestation digest and attestation signature.
+6. Verify exact field equality across all bindings.
+7. Verify trusted, fresh revocation status for both inner G1 permit signer and outer permit-envelope signer, attestation issuer/key, policy issuer/key, and policy ID/version/digest.
+8. Verify time bounds using trusted enforcement time and configured clock-skew rules.
+9. Verify actual action digest and authenticated tenant/principal/agent match.
+10. Atomically consume tenant-scoped permit identity using the G2 linearizable consume invariant.
+11. Only after successful consumption may the adapter initiate the protected side effect.
 
 The adapter MUST NOT execute on partial verification or continue in degraded/offline mode when a required trust or revocation dependency is unavailable.
 
