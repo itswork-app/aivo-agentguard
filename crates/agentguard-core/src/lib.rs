@@ -7,20 +7,28 @@ mod canonical;
 mod crypto;
 mod protocol;
 
-pub use canonical::{canonical_json, domain_digest, hex_digest, CanonicalizationError};
-pub use crypto::{verify_ed25519, CryptoError};
-pub use protocol::{Decision, KeyPurpose, SignatureEnvelope, SignatureAlgorithm, ProtocolShapeError};
+pub use canonical::{CanonicalizationError, canonical_json, domain_digest, hex_digest};
+pub use crypto::{CryptoError, verify_ed25519};
+pub use protocol::{
+    Decision, KeyPurpose, ProtocolShapeError, SignatureAlgorithm, SignatureEnvelope,
+};
 
 #[cfg(test)]
 mod tests {
-    use serde::Serialize;
     use crate::{canonical_json, domain_digest, hex_digest};
+    use serde::Serialize;
 
     #[derive(Serialize)]
-    struct ReorderedA { z: u64, a: &'static str }
+    struct ReorderedA {
+        z: u64,
+        a: &'static str,
+    }
 
     #[derive(Serialize)]
-    struct ReorderedB { a: &'static str, z: u64 }
+    struct ReorderedB {
+        a: &'static str,
+        z: u64,
+    }
 
     #[test]
     fn canonical_json_is_independent_of_struct_field_order() {
