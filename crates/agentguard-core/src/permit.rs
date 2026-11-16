@@ -333,7 +333,7 @@ impl PermitEnvelopeV2 {
     pub fn digest(&self) -> Result<[u8; 32], CanonicalizationError> {
         let canonical = canonical_json(self)?;
         Ok(domain_digest(
-            b"AIVO-AGENTGUARD-PERMIT-ENVELOPE-REF-V2\\0",
+            b"AIVO-AGENTGUARD-PERMIT-ENVELOPE-REF-V2\0",
             &canonical,
         ))
     }
