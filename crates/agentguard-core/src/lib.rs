@@ -6,10 +6,15 @@
 mod canonical;
 mod crypto;
 mod protocol;
+mod permit;
 mod revocation;
 
 pub use canonical::{CanonicalizationError, canonical_json, domain_digest, hex_digest};
 pub use crypto::{CryptoError, verify_ed25519};
+pub use permit::{
+    AttestationBindingV1, AuthorizationPermitV1, PermitEnvelopeError, PermitEnvelopeV2,
+    PolicyProvenanceV1,
+};
 pub use protocol::{
     AttestationVerificationError, AuthorizationAttestationV1, ChallengeVerificationError, Decision,
     DecisionEventRef, EvidenceReceiptRef, KeyPurpose, ProtocolShapeError, SignatureAlgorithm,
