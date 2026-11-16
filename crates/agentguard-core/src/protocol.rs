@@ -79,7 +79,7 @@ pub struct SigningChallengeV1 {
     pub signer_key_id: String,
 }
 
-/// Complete challenge token carried by PermitEnvelopeV2.
+/// Complete challenge token carried by `PermitEnvelopeV2`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SignedSigningChallengeV1 {
@@ -362,7 +362,6 @@ impl SignedAuthorizationAttestationV1 {
             .map_err(AttestationVerificationError::Crypto)
     }
 
-    /// Require exact challenge, tenant, request, action, policy and context binding.
     /// Digest the complete canonical attestation and signature envelope.
     ///
     /// # Errors
@@ -376,6 +375,12 @@ impl SignedAuthorizationAttestationV1 {
         ))
     }
 
+    /// Require exact challenge, tenant, request, action, policy and context binding.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the challenge or attestation is malformed or any
+    /// bound field, digest, or timestamp ordering differs.
     pub fn validate_challenge_binding(
         &self,
         challenge: &SignedSigningChallengeV1,
