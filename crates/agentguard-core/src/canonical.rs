@@ -23,7 +23,7 @@ pub enum CanonicalizationError {
 /// # Errors
 ///
 /// Returns an error when serialization fails or a number violates the
-/// AgentGuard canonical numeric restrictions.
+/// Product canonical numeric restrictions.
 pub fn canonical_json<T: Serialize>(value: &T) -> Result<Vec<u8>, CanonicalizationError> {
     let value = serde_json::to_value(value)?;
     validate_numbers(&value)?;
