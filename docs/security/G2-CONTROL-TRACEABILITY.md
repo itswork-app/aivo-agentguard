@@ -27,6 +27,8 @@ This matrix maps the G2 threat register to the approved G1 security invariants a
 | T-018 Canonicalization differential | SEC-003, SEC-009 | Cross-language golden vectors and parser fuzzing |
 | T-019 Denial of service | SEC-002 | Bounded evaluation, rate limiting, backpressure and fail-closed tests |
 | T-020 Evidence privacy leak | SEC-006, SEC-007 | Forbidden-secret scanning, redaction tests, retention review |
+| T-021 Authorization-attestation issuer compromise | SEC-006, SEC-010 | Attestation signature/claim-binding tests; issuer rotation, revocation and compromise simulation |
+| T-022 Stale/unavailable revocation state | SEC-010 | Freshness-boundary tests; stale, missing and partitioned revocation service must fail closed |
 
 ## Required proof artifacts
 
