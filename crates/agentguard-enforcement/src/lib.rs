@@ -228,7 +228,6 @@ where
 
     let verification_keys = resolve_envelope_keys(envelope, keys)?;
     let snapshot = verify_current_revocation(
-        envelope,
         keys,
         revocation_source,
         high_water_store,
@@ -306,7 +305,6 @@ fn resolve_envelope_keys<K: VerificationKeyResolver>(
 }
 
 fn verify_current_revocation<K, R, H>(
-    envelope: &PermitEnvelopeV2,
     keys: &K,
     source: &R,
     high_water_store: &H,
