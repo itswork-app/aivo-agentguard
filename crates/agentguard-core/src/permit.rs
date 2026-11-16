@@ -9,8 +9,8 @@ use serde::{Deserialize, Serialize};
 use crate::{
     CanonicalizationError, CryptoError, Decision, ProtocolShapeError, SignatureEnvelope,
     SignedAuthorizationAttestationV1, SignedSigningChallengeV1, canonical_json, hex_digest,
-    verify_ed25519,
     protocol::{parse_timestamp, validate_hex_digest, validate_identifier, validate_lifetime},
+    verify_ed25519,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
