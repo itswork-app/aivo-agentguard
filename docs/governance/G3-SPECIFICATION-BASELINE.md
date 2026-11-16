@@ -1,6 +1,6 @@
 # G3 Specification Baseline — Authorization Proof and Permit Binding
 
-**Status:** Proposed — product owner approval required  
+**Status:** Approved and frozen — Product Owner approval recorded 2026-11-17  
 **Version:** 0.1.0  
 **Parent baselines:** G1 v0.1.0 and G2 v0.1.0  
 **Branch:** `feat/g3-authorization-proof-permit-binding`
@@ -23,7 +23,7 @@ G3 is a protocol/specification gate. It does not implement runtime signing, enfo
 - G3-required consumers reject standalone G1 v1 permits; no downgrade fallback.
 - Any later change to G1 semantics requires an explicit versioned migration and owner approval.
 
-## 3. Proposed normative decisions
+## 3. Approved normative decisions
 
 1. Authorization-attestation issuer is a separate trust boundary from runtime coordinator and permit signer.
 2. Attestation issuer independently validates all input provenance and independently recomputes the deterministic decision; runtime ALLOW assertion is never sufficient.
@@ -50,15 +50,15 @@ G3 is a protocol/specification gate. It does not implement runtime signing, enfo
 
 The current AI-assisted specification review is recorded in `security/G3-ADVERSARIAL-REVIEW.md`. It is a conditional pass for continued Draft review only, not Product Owner approval, third-party audit, implementation approval, or production authorization. Its limitations and unresolved questions remain binding.
 
-## 6. Open review questions
+## 6. Approved product decisions
 
-Maintainer recommendations for each open decision are recorded in `governance/G3-OPEN-DECISIONS.md`. They cover evaluator isolation, revocation signing, artifact provenance, evidence receipt topology, and trusted time/high-water-mark storage. The recommendations remain proposed until explicitly accepted by the Product Owner.
+All five G3 open decisions are approved and recorded in `governance/G3-OPEN-DECISIONS.md`: independent evaluator strategy, revocation signing and recovery, evaluator artifact provenance, durable evidence receipt topology, and trusted time/rollback-resistant state. These decisions are normative for G3 v0.1.0.
 
-These questions do not permit a weaker default. Until resolved, the specified fail-closed behavior applies.
+Implementation details and operational evidence remain release gates; they are not represented as already implemented.
 
 ## 7. Exit criteria
 
-- Product owner approves the G3 protocol baseline.
+- Product Owner approval of the G3 protocol baseline and all five open decisions is recorded.
 - ADRs accepted and cross-document consistency verified.
 - Golden vectors and implementation-level test fixtures defined.
 - Rust implementation maps every MUST to a typed API and test.
