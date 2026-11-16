@@ -164,11 +164,7 @@ impl SignedRevocationSnapshotV1 {
         ))
     }
 
-    pub fn verify_at(
-        &self,
-        public_key: &[u8; 32],
-        now_utc: &str,
-    ) -> Result<(), RevocationError> {
+    pub fn verify_at(&self, public_key: &[u8; 32], now_utc: &str) -> Result<(), RevocationError> {
         self.claims.validate_at(now_utc)?;
         self.signature
             .validate_shape()
@@ -235,15 +231,15 @@ fn parse_timestamp(value: &str) -> Result<i64, RevocationError> {
         || bytes[13] != b':'
         || bytes[16] != b':'
         || bytes[19] != b'Z'
-        || bytes.iter().enumerate().any(|(i, byte)| {
-            !matches!(i, 4 | 7 | 10 | 13 | 16 | 19) && !byte.is_ascii_digit()
-        })
+        || bytes
+            .iter()
+            .enumerate()
+            .any(|(i, byte)| !matches!(i, 4 | 7 | 10 | 13 | 16 | 19) && !byte.is_ascii_digit())
     {
         return Err(RevocationError::InvalidShape);
     }
-    let number = |range: std::ops::Range<usize>| -> i64 {
-        value[range].parse::<i64>().unwrap_or_default()
-    };
+    let number =
+        |range: std::ops::Range<usize>| -> i64 { value[range].parse::<i64>().unwrap_or_default() };
     let year = number(0..4);
     let month = number(5..7);
     let day = number(8..10);
