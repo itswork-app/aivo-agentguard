@@ -369,10 +369,7 @@ mod tests {
     #[test]
     fn missing_trusted_bootstrap_checkpoint_fails_closed() {
         assert_eq!(
-            validate_progression(
-                None,
-                &mark(2, 1, &"aa".repeat(32), "2026-11-17T10:00:00Z")
-            ),
+            validate_progression(None, &mark(2, 1, &"aa".repeat(32), "2026-11-17T10:00:00Z")),
             Err(RevocationError::InvalidShape)
         );
     }
