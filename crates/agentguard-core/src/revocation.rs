@@ -220,10 +220,12 @@ impl RevocationSnapshotV1 {
     pub fn validate_at(&self, now_utc: &str) -> Result<(), RevocationError> {
         if self.schema_version != 1
             || self.registry_id.is_empty()
+            || self.registry_id.len() > 256
             || self.registry_id.trim() != self.registry_id
             || self.registry_epoch == 0
             || self.sequence == 0
             || self.signing_key_id.is_empty()
+            || self.signing_key_id.len() > 256
             || self.signing_key_id.trim() != self.signing_key_id
             || self.entries.is_empty()
         {
@@ -247,6 +249,7 @@ impl RevocationSnapshotV1 {
         let mut previous: Option<(&str, &str)> = None;
         for entry in &self.entries {
             if entry.subject_id.is_empty()
+                || entry.subject_id.len() > 256
                 || entry.subject_id.trim() != entry.subject_id
                 || entry.subject_id.contains('*')
                 || entry.subject_id.contains('?')
@@ -254,7 +257,11 @@ impl RevocationSnapshotV1 {
                 return Err(RevocationError::InvalidSubject);
             }
             let effective = parse_timestamp(&entry.effective_at)?;
-            if effective > updated {
+            if effective > updated
+                || entry.reason_code.as_ref().is_some_and(|reason| {
+                    reason.is_empty() || reason.len() > 128 || reason.trim() != reason
+                })
+            {
                 return Err(RevocationError::InvalidShape);
             }
             if let Some(prior) = previous {
