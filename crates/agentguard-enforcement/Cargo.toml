@@ -9,7 +9,7 @@ repository.workspace = true
 [dependencies]
 agentguard-core = { path = "../agentguard-core" }
 serde = { version = "1", features = ["derive"] }
-agentguard-runtime = { path = "../agentguard-runtime" }
+thiserror = "2"
 
 [lib]
 path = "src/lib.rs"
