@@ -7,8 +7,8 @@
 
 use agentguard_core::{
     KeyPurpose, PermitEnvelopeError, PermitEnvelopeV2, RevocationHighWaterMarkStore,
-    RevocationPersistenceError, RevocationStatus, RevocationSubjectType, SignedRevocationSnapshotV1,
-    persist_verified_snapshot,
+    RevocationPersistenceError, RevocationStatus, RevocationSubjectType,
+    SignedRevocationSnapshotV1, persist_verified_snapshot,
 };
 use serde::{Deserialize, Serialize};
 
