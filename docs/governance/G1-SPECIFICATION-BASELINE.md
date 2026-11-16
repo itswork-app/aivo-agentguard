@@ -8,7 +8,7 @@
 
 G1 turns the G0 product and architecture direction into a coherent, testable contract set. The product owner approved this baseline on 2026-11-16. It was merged to main in PR #3 at commit `62b7becf3c82110f5d737d7aa850f43483fed1d7` and is frozen as the G1 v0.1.0 reference.
 
-## Normative decisions proposed
+## Frozen normative decisions
 
 1. Rust is the authoritative deterministic policy core.
 2. Authorization decisions are exactly ALLOW, DENY, and REQUIRE_APPROVAL.
