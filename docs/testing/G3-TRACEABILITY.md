@@ -1,6 +1,6 @@
 # G3 Requirement-to-Test Traceability
 
-**Status:** Proposed — implementation gate  
+**Status:** Approved traceability contract — implementation gate remains  
 **Version:** 0.1.0
 
 | Requirement | Normative source | Acceptance tests |
