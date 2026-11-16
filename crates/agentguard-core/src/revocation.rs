@@ -369,22 +369,22 @@ mod tests {
     #[test]
     fn missing_trusted_bootstrap_checkpoint_fails_closed() {
         assert_eq!(
-            validate_progression(None, &mark(2, 1, &"aa".repeat(32), "2026-11-17T10:00:00Z")),
+            validate_progression(None, &mark(2, 1, &&"aa".repeat(32).repeat(32), "2026-11-17T10:00:00Z")),
             Err(RevocationError::InvalidShape)
         );
     }
 
     #[test]
     fn exact_duplicate_snapshot_is_idempotent() {
-        let prior = mark(2, 7, "aa", "2026-11-17T10:00:00Z");
-        let next = mark(2, 7, "aa", "2026-11-17T10:00:00Z");
+        let prior = mark(2, 7, &"aa".repeat(32), "2026-11-17T10:00:00Z");
+        let next = mark(2, 7, &"aa".repeat(32), "2026-11-17T10:00:00Z");
         assert_eq!(validate_progression(Some(&prior), &next), Ok(false));
     }
 
     #[test]
     fn same_sequence_with_different_digest_is_rejected() {
-        let prior = mark(2, 7, "aa", "2026-11-17T10:00:00Z");
-        let next = mark(2, 7, "bb", "2026-11-17T10:00:00Z");
+        let prior = mark(2, 7, &"aa".repeat(32), "2026-11-17T10:00:00Z");
+        let next = mark(2, 7, &"bb".repeat(32), "2026-11-17T10:00:00Z");
         assert_eq!(
             validate_progression(Some(&prior), &next),
             Err(RevocationError::SequenceEquivocation)
@@ -393,13 +393,13 @@ mod tests {
 
     #[test]
     fn rollback_and_untrusted_epoch_change_are_rejected() {
-        let prior = mark(2, 7, "aa", "2026-11-17T10:00:00Z");
+        let prior = mark(2, 7, &"aa".repeat(32), "2026-11-17T10:00:00Z");
         assert_eq!(
-            validate_progression(Some(&prior), &mark(2, 6, "bb", "2026-11-17T10:00:00Z")),
+            validate_progression(Some(&prior), &mark(2, 6, &"bb".repeat(32), "2026-11-17T10:00:00Z")),
             Err(RevocationError::SequenceRollback)
         );
         assert_eq!(
-            validate_progression(Some(&prior), &mark(3, 8, "cc", "2026-11-17T10:00:01Z")),
+            validate_progression(Some(&prior), &mark(3, 8, &"cc".repeat(32), "2026-11-17T10:00:01Z")),
             Err(RevocationError::EpochTransition)
         );
     }
