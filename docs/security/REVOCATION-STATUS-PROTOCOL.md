@@ -9,7 +9,8 @@ Define authenticated, rollback-resistant, bounded-freshness status data used by 
 - policy issuer signing keys;
 - policy identities, versions, and digests;
 - authorization-attestation issuer keys and issuer identities;
-- permit-envelope signing keys;
+- G1 inner permit signing keys;
+- PermitEnvelopeV2 outer signing keys;
 - evidence-service signing keys where evidence receipts are relied upon.
 
 A status response is not trusted merely because it arrives over authenticated transport. It must be signed by a configured revocation authority.
@@ -69,11 +70,12 @@ A consumer MUST persist the highest accepted sequence and epoch in rollback-resi
 ## 5. Required lookup set
 
 At permit signing and again immediately before permit consumption, the consumer MUST resolve status for:
-1. permit-envelope signing key;
-2. authorization-attestation issuer identity and signing key;
-3. policy issuer identity and signing key;
-4. exact policy ID/version/digest;
-5. evidence receipt signing key, if the receipt is part of the attestation validation chain.
+1. inner G1 permit signing key;
+2. outer PermitEnvelopeV2 signing key;
+3. authorization-attestation issuer identity and signing key;
+4. policy issuer identity and signing key;
+5. exact policy ID/version/digest;
+6. evidence receipt signing key, if the receipt is part of the attestation validation chain.
 
 The attestation issuer itself must also check the policy issuer/key and policy digest before issuing an attestation.
 
