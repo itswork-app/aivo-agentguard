@@ -204,8 +204,8 @@ impl SignedRevocationSnapshotV1 {
     ///
     /// # Errors
     ///
-    /// Returns an error for invalid snapshot shape, stale status, key mismatch,
-    /// canonicalization failure, or signature verification failure.
+    /// Returns an error for registry mismatch, invalid snapshot shape, stale
+    /// status, key mismatch, canonicalization failure, or signature verification failure.
     pub fn verify_at(
         &self,
         public_key: &[u8; 32],
@@ -391,6 +391,62 @@ mod tests {
             snapshot_digest: digest.into(),
             this_update: updated.into(),
         }
+    }
+
+    #[test]
+    fn verifies_signed_snapshot_and_pinned_registry_before_checkpoint() {
+        use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+        use ed25519_dalek::{Signer, SigningKey};
+
+        let signing_key = SigningKey::from_bytes(&[23_u8; 32]);
+        let claims = RevocationSnapshotV1 {
+            schema_version: 1,
+            registry_id: "registry-1".into(),
+            registry_epoch: 1,
+            sequence: 1,
+            issued_at: "2026-11-17T10:00:00Z".into(),
+            this_update: "2026-11-17T10:00:00Z".into(),
+            next_update: "2026-11-17T10:00:30Z".into(),
+            entries: vec![RevocationEntryV1 {
+                subject_type: RevocationSubjectType::PermitSignerKey,
+                subject_id: "permit-key-1".into(),
+                status: RevocationStatus::Active,
+                effective_at: "2026-11-17T10:00:00Z".into(),
+                reason_code: None,
+            }],
+            signing_key_id: "revocation-key-1".into(),
+        };
+        let canonical = canonical_json(&claims).unwrap();
+        let mut message = b"AIVO-AGENTGUARD-REVOCATION-SNAPSHOT-V1\0".to_vec();
+        message.extend_from_slice(&canonical);
+        let signature = signing_key.sign(&message);
+        let signed = SignedRevocationSnapshotV1 {
+            claims,
+            signature: SignatureEnvelope {
+                algorithm: crate::SignatureAlgorithm::Ed25519,
+                key_id: "revocation-key-1".into(),
+                signature: URL_SAFE_NO_PAD.encode(signature.to_bytes()),
+            },
+        };
+
+        let checkpoint = signed
+            .verified_high_water_mark(
+                signing_key.verifying_key().as_bytes(),
+                "registry-1",
+                "2026-11-17T10:00:10Z",
+            )
+            .unwrap();
+        assert_eq!(checkpoint.registry_id, "registry-1");
+        assert_eq!(checkpoint.sequence, 1);
+        assert_eq!(checkpoint.snapshot_digest.len(), 64);
+        assert_eq!(
+            signed.verify_at(
+                signing_key.verifying_key().as_bytes(),
+                "another-registry",
+                "2026-11-17T10:00:10Z"
+            ),
+            Err(RevocationError::RegistryMismatch)
+        );
     }
 
     #[test]
