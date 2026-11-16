@@ -31,6 +31,8 @@ This analysis uses assets, trust boundaries, attacker capabilities, attack paths
 | T-018 | Parser/canonicalization differential | Digest mismatch or bypass | Single canonical spec, strict schemas, cross-language vectors, fuzzing | Uncovered implementation divergence |
 | T-019 | Denial of service on authorization path | Legitimate actions blocked | Rate limits, bounded work, backpressure | Fail-closed design reduces availability |
 | T-020 | Sensitive action/context data leaked via evidence | Privacy breach | Digest-first storage, allowlists, redaction, retention controls | Metadata can still be identifying |
+| T-021 | Authorization-attestation issuer compromised or forged | Forged ALLOW attestation leads to permit issuance | Separate issuer trust boundary; signature and exact-claim verification; issuer revocation; short freshness bound | Compromised issuer before revocation propagates |
+| T-022 | Revocation state stale or unavailable at signing/enforcement | Compromised key or issuer remains trusted | Bounded revocation freshness; fail closed on stale/unavailable state; no offline freshness extension | Availability loss during control-plane outage |
 
 ## 3. Highest-risk controls requiring proof
 
@@ -42,7 +44,7 @@ This analysis uses assets, trust boundaries, attacker capabilities, attack paths
 6. Evidence append must be durable before permit issuance.
 7. The permit signer must verify a cryptographically authenticated, exact-action-bound authorization attestation; a compromised runtime must not turn an arbitrary `ALLOW` field into a signed permit.
 8. Key and issuer revocation state must be fresh at signing and enforcement; stale or unavailable revocation state fails closed.
-7. Adapter bypass and TOCTOU behavior must be assessed per integration.
+9. Adapter bypass and TOCTOU behavior must be assessed per integration.
 
 ## 4. Abuse cases
 
