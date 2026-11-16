@@ -10,7 +10,7 @@ use crate::{
     CanonicalizationError, CryptoError, Decision, ProtocolShapeError, SignatureEnvelope,
     SignedAuthorizationAttestationV1, SignedSigningChallengeV1, canonical_json, hex_digest,
     protocol::{parse_timestamp, validate_hex_digest, validate_identifier, validate_lifetime},
-    verify_ed25519,
+    domain_digest, verify_ed25519,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -171,6 +171,10 @@ pub enum PermitEnvelopeError {
     CrossBindingMismatch,
     #[error("permit envelope timestamps are invalid or out of order")]
     InvalidTimestampOrder,
+    #[error("permit envelope is not yet valid")]
+    NotYetValid,
+    #[error("permit envelope has expired")]
+    Expired,
     #[error("permit envelope expiry exceeds an inner artifact expiry")]
     ExpiryEscalation,
     #[error("protocol validation failed: {0}")]
@@ -300,6 +304,38 @@ impl PermitEnvelopeV2 {
             return Err(PermitEnvelopeError::InvalidTimestampOrder);
         }
         Ok(())
+    }
+
+    /// Validate the envelope against trusted current UTC time.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid shape, a not-yet-valid envelope, or expiry.
+    pub fn validate_at(&self, now_utc: &str) -> Result<(), PermitEnvelopeError> {
+        self.validate_shape()?;
+        let now = parse_timestamp(now_utc)?;
+        let issued = parse_timestamp(&self.issued_at)?;
+        let expires = parse_timestamp(&self.expires_at)?;
+        if now < issued {
+            return Err(PermitEnvelopeError::NotYetValid);
+        }
+        if now >= expires {
+            return Err(PermitEnvelopeError::Expired);
+        }
+        Ok(())
+    }
+
+    /// Compute the canonical digest of the complete signed envelope.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if canonical JSON serialization fails.
+    pub fn digest(&self) -> Result<[u8; 32], CanonicalizationError> {
+        let canonical = canonical_json(self)?;
+        Ok(domain_digest(
+            b"AIVO-AGENTGUARD-PERMIT-ENVELOPE-REF-V2\\0",
+            &canonical,
+        ))
     }
 
     /// Build the exact domain-separated message signed by the outer envelope signer.
