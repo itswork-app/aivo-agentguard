@@ -37,6 +37,8 @@ Define the security architecture that implements the approved G1 authorization c
 - No agent or LLM output is trusted as identity, policy, approval, context attestation, or authorization.
 - Authorization core has no network access, clock access, filesystem secrets, or signing private keys.
 - Policy and permit signing operations are isolated from policy evaluation.
+- The permit signer MUST NOT treat an unauthenticated runtime assertion such as `decision = ALLOW` as proof of authorization. Before signing, it must verify a cryptographically authenticated authorization attestation bound to the exact tenant, principal, agent, request, action digest, policy digest, context digest, decision, and durable decision-evidence reference. The attestation issuer and its trust boundary must be explicit; a runtime compromise must not silently become signing authority.
+- The signer MUST verify attestation freshness and current issuer/key revocation state. If revocation state is unavailable or exceeds its configured freshness bound, signing fails closed.
 - Enforcement must not trust a permit merely because it was returned by an in-process function; signature, claims, expiry, and single-use state are verified at the boundary.
 - Tenant identity is derived from authenticated identity context, never from an untrusted action payload.
 - Every adapter must document bypass paths and external side-effect semantics.
