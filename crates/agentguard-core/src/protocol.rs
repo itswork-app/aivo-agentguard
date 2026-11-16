@@ -33,12 +33,19 @@ pub struct SignatureEnvelope {
     pub signature: String,
 }
 
+/// Signature algorithm fixed by protocol version 1.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SignatureAlgorithm {
     Ed25519,
 }
 
 impl SignatureEnvelope {
+    /// Validate fields that can be checked without resolving a trust-store key.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the key identifier is empty/whitespace-padded or
+    /// the signature string is empty.
     pub fn validate_shape(&self) -> Result<(), ProtocolShapeError> {
         if self.key_id.is_empty() || self.key_id.trim() != self.key_id {
             return Err(ProtocolShapeError::InvalidKeyId);
@@ -50,6 +57,7 @@ impl SignatureEnvelope {
     }
 }
 
+/// Shape validation errors for signature envelopes.
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum ProtocolShapeError {
     #[error("key identifier is empty or contains surrounding whitespace")]
