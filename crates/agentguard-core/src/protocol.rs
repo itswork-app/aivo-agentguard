@@ -431,6 +431,140 @@ pub enum AttestationVerificationError {
     Crypto(#[from] crate::CryptoError),
 }
 
+
+/// Exact values the challenge replay store must atomically bind and consume.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ChallengeConsumptionV1 {
+    pub challenge_id: String,
+    pub tenant_id: String,
+    pub nonce: String,
+    pub pending_signing_request_digest: String,
+    pub request_digest: String,
+    pub action_digest: String,
+    pub policy_digest: String,
+    pub context_digest: String,
+    pub challenge_digest: String,
+    pub attestation_digest: String,
+    pub expires_at: String,
+}
+
+/// Fail-closed outcomes from the atomic challenge replay store.
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+pub enum ChallengeReplayStoreError {
+    #[error("challenge is unknown to the pending signing request store")]
+    UnknownChallenge,
+    #[error("challenge or nonce has already been consumed")]
+    AlreadyConsumed,
+    #[error("challenge consumption binding differs from the pending request")]
+    BindingMismatch,
+    #[error("challenge replay store is unavailable")]
+    Unavailable,
+}
+
+/// Atomic single-use challenge consumption contract.
+///
+/// Implementations MUST atomically bind challenge ID, nonce, tenant, pending
+/// request digest, challenge digest, attestation digest, and expiry. Consumption
+/// MUST be durable and linearizable before a permit may be issued. Missing,
+/// duplicate, mismatched, expired, or unavailable state MUST fail closed.
+pub trait ChallengeReplayStore: Send + Sync {
+    /// Atomically consume one challenge for one verified attestation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for unknown, duplicate, mismatched, expired, or unavailable state.
+    fn consume_once(
+        &self,
+        consumption: &ChallengeConsumptionV1,
+        now_utc: &str,
+    ) -> Result<(), ChallengeReplayStoreError>;
+}
+
+/// Errors while verifying and consuming a permit-signer challenge.
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+pub enum ChallengeConsumptionError {
+    #[error("challenge is not yet valid")]
+    NotYetValid,
+    #[error("challenge or attestation has expired")]
+    Expired,
+    #[error("challenge signature verification failed: {0}")]
+    ChallengeSignature(String),
+    #[error("attestation signature verification failed: {0}")]
+    AttestationSignature(String),
+    #[error("challenge and attestation binding differs")]
+    BindingMismatch,
+    #[error("canonical digest generation failed: {0}")]
+    Canonicalization(String),
+    #[error("protocol validation failed: {0}")]
+    Protocol(#[from] ProtocolShapeError),
+    #[error("challenge replay store rejected consumption: {0}")]
+    Store(#[from] ChallengeReplayStoreError),
+}
+
+/// Verify both signatures and exact bindings, then atomically consume the challenge.
+///
+/// The caller must resolve the challenge and attestation public keys from their
+/// respective purpose-scoped trust stores. This operation does not issue a permit.
+///
+/// # Errors
+///
+/// Returns an error for invalid signatures, binding mismatch, invalid time,
+/// expired artifacts, or replay-store rejection/unavailability.
+pub fn consume_attested_challenge<S: ChallengeReplayStore>(
+    store: &S,
+    challenge: &SignedSigningChallengeV1,
+    attestation: &SignedAuthorizationAttestationV1,
+    challenge_public_key: &[u8; 32],
+    attestation_public_key: &[u8; 32],
+    now_utc: &str,
+) -> Result<(), ChallengeConsumptionError> {
+    challenge
+        .verify_signature(challenge_public_key)
+        .map_err(|error| ChallengeConsumptionError::ChallengeSignature(error.to_string()))?;
+    attestation
+        .verify_signature(attestation_public_key)
+        .map_err(|error| ChallengeConsumptionError::AttestationSignature(error.to_string()))?;
+    attestation
+        .validate_challenge_binding(challenge)
+        .map_err(|_| ChallengeConsumptionError::BindingMismatch)?;
+
+    let now = parse_timestamp(now_utc)?;
+    let challenge_issued = parse_timestamp(&challenge.claims.issued_at)?;
+    let challenge_expires = parse_timestamp(&challenge.claims.expires_at)?;
+    let attestation_issued = parse_timestamp(&attestation.claims.issued_at)?;
+    let attestation_expires = parse_timestamp(&attestation.claims.expires_at)?;
+
+    if now < challenge_issued || now < attestation_issued {
+        return Err(ChallengeConsumptionError::NotYetValid);
+    }
+    if now >= challenge_expires || now >= attestation_expires {
+        return Err(ChallengeConsumptionError::Expired);
+    }
+
+    let challenge_digest = challenge
+        .digest()
+        .map_err(|error| ChallengeConsumptionError::Canonicalization(error.to_string()))?;
+    let attestation_digest = attestation
+        .digest()
+        .map_err(|error| ChallengeConsumptionError::Canonicalization(error.to_string()))?;
+    let consumption = ChallengeConsumptionV1 {
+        challenge_id: challenge.claims.challenge_id.clone(),
+        tenant_id: challenge.claims.tenant_id.clone(),
+        nonce: challenge.claims.nonce.clone(),
+        pending_signing_request_digest: challenge.claims.pending_signing_request_digest.clone(),
+        request_digest: challenge.claims.request_digest.clone(),
+        action_digest: challenge.claims.action_digest.clone(),
+        policy_digest: challenge.claims.policy_digest.clone(),
+        context_digest: challenge.claims.context_digest.clone(),
+        challenge_digest: hex_digest(&challenge_digest),
+        attestation_digest: hex_digest(&attestation_digest),
+        expires_at: challenge.claims.expires_at.clone(),
+    };
+    store.consume_once(&consumption, now_utc)?;
+    Ok(())
+}
+
 pub(crate) fn validate_identifier(value: &str) -> Result<(), ProtocolShapeError> {
     if value.is_empty() || value.trim() != value || value.len() > 256 {
         return Err(ProtocolShapeError::InvalidIdentifier);
