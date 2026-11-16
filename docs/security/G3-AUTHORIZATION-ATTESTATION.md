@@ -1,6 +1,6 @@
 # G3 Authorization Attestation Protocol
 
-**Status:** Proposed — G3 review required  
+**Status:** Approved — normative G3 v0.1.0  
 **Version:** 0.1.0  
 **Depends on:** G1 v0.1.0; G2 v0.1.0  
 **Normative scope:** Authorization attestation between independent verifier, permit signer, and enforcement boundary.
