@@ -101,6 +101,19 @@ pub enum RevocationError {
 }
 
 impl RevocationSnapshotV1 {
+    /// Return only an exact subject match. Missing subjects are UNKNOWN and fail closed.
+    #[must_use]
+    pub fn status_for(
+        &self,
+        subject_type: RevocationSubjectType,
+        subject_id: &str,
+    ) -> RevocationStatus {
+        self.entries
+            .iter()
+            .find(|entry| entry.subject_type == subject_type && entry.subject_id == subject_id)
+            .map_or(RevocationStatus::Unknown, |entry| entry.status)
+    }
+
     /// Validate schema, canonical ordering, and bounded freshness against trusted UTC time.
     ///
     /// # Errors
@@ -243,8 +256,11 @@ pub fn validate_progression(
     candidate: &RevocationHighWaterMark,
 ) -> Result<bool, RevocationError> {
     let Some(previous) = previous else {
-        return Ok(true);
+        // First-use bootstrap must be seeded from an out-of-band trusted checkpoint.
+        return Err(RevocationError::InvalidShape);
     };
+    validate_high_water_mark(previous)?;
+    validate_high_water_mark(candidate)?;
     if candidate.registry_id != previous.registry_id
         || candidate.registry_epoch != previous.registry_epoch
     {
@@ -266,6 +282,23 @@ pub fn validate_progression(
         return Err(RevocationError::UpdateRollback);
     }
     Ok(true)
+}
+
+fn validate_high_water_mark(mark: &RevocationHighWaterMark) -> Result<(), RevocationError> {
+    if mark.registry_id.is_empty()
+        || mark.registry_id.trim() != mark.registry_id
+        || mark.registry_epoch == 0
+        || mark.sequence == 0
+        || mark.snapshot_digest.len() != 64
+        || !mark
+            .snapshot_digest
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        return Err(RevocationError::InvalidShape);
+    }
+    parse_timestamp(&mark.this_update)?;
+    Ok(())
 }
 
 fn parse_timestamp(value: &str) -> Result<i64, RevocationError> {
@@ -331,6 +364,14 @@ mod tests {
             snapshot_digest: digest.into(),
             this_update: updated.into(),
         }
+    }
+
+    #[test]
+    fn missing_trusted_bootstrap_checkpoint_fails_closed() {
+        assert_eq!(
+            validate_progression(None, &mark(2, 1, &"aa".repeat(32), "2026-11-17T10:00:00Z")),
+            Err(RevocationError::InvalidShape)
+        );
     }
 
     #[test]
