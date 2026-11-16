@@ -566,8 +566,10 @@ mod tests {
                 signature: URL_SAFE_NO_PAD.encode(signature.to_bytes()),
             },
         };
-        assert!(token
-            .verify_signature(signing_key.verifying_key().as_bytes())
-            .is_ok());
+        assert!(
+            token
+                .verify_signature(signing_key.verifying_key().as_bytes())
+                .is_ok()
+        );
     }
 }
