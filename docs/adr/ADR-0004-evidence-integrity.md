@@ -1,6 +1,6 @@
 # ADR-0004: Append-Only Evidence and Hash Chains
 
-- **Status:** Proposed
+- **Status:** Accepted — product owner approved 2026-11-16
 - **Date:** 2026-11-16
 - **Decision owners:** Project maintainer
 
