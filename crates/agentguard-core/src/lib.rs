@@ -14,12 +14,6 @@ pub use revocation::{
     RevocationEntryV1, RevocationError, RevocationHighWaterMark, RevocationSnapshotV1,
     RevocationStatus, RevocationSubjectType, SignedRevocationSnapshotV1, validate_progression,
 };
-pub use protocol::{
-    AttestationVerificationError, AuthorizationAttestationV1, ChallengeVerificationError,
-    Decision, DecisionEventRef, EvidenceReceiptRef, KeyPurpose,
-    ProtocolShapeError, SignatureAlgorithm, SignatureEnvelope, SignedAuthorizationAttestationV1,
-    SignedSigningChallengeV1, SigningChallengeV1,
-};
 
 #[cfg(test)]
 mod tests {
@@ -27,9 +21,9 @@ mod tests {
     use serde::Serialize;
 
     #[derive(Serialize)]
-    struct ReorderedA { z: u64, a: &'static str }
+    struct ReorderedA {\n        z: u64,\n        a: &'static str,\n    }
     #[derive(Serialize)]
-    struct ReorderedB { a: &'static str, z: u64 }
+    struct ReorderedB {\n        a: &'static str,\n        z: u64,\n    }
 
     #[test]
     fn canonical_json_is_independent_of_struct_field_order() {
