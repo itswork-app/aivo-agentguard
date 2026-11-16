@@ -1,18 +1,28 @@
 # License Decision
 
-**Status:** Proposed — maintainer approval required
+**Status:** Approved by project owner — 2026-11-16
 
-## Recommendation
+## Decision
 
-Adopt Apache License 2.0 for the core repository, subject to maintainer and legal review. It is a permissive license with an explicit patent license and is commonly used for infrastructure projects.
+The AIVO AgentGuard repository is licensed under the **Apache License, Version 2.0**.
 
-## Before finalization
+The complete license text is in the repository-root `LICENSE` file. Cargo workspace and crate metadata declare `Apache-2.0`.
 
-- Confirm the project owner has authority to license all contributed material.
-- Confirm whether a Developer Certificate of Origin (DCO) or Contributor License Agreement (CLA) is appropriate.
-- Add the complete canonical license text and required notices.
-- Update contribution guidance and repository metadata consistently.
+## Rationale
 
-## Current restriction
+- Permissive licensing supports broad adoption and commercial integration.
+- The license includes an express patent grant and patent-litigation termination provision.
+- It is widely recognized in open-source infrastructure projects.
 
-Until the license is approved and the full license text is committed, the repository must not claim that its code is already available under Apache-2.0 and should not solicit external code contributions as if licensing were settled.
+## Contribution terms
+
+Contributions intentionally submitted for inclusion are licensed under Apache-2.0, subject to the terms of that license. No separate CLA or DCO is adopted at this stage. Contributors must have the right to submit their contributions and must not submit third-party material without appropriate permission.
+
+## Compliance requirements
+
+- Preserve the license and applicable notices when redistributing.
+- Mark modified files where required by the license.
+- Review third-party dependencies and their licenses before inclusion.
+- Do not imply that the license grants rights to project trademarks or names.
+
+This records the repository owner's project decision; it is not a substitute for jurisdiction-specific legal advice.
