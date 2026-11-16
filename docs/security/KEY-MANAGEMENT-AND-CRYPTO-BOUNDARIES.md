@@ -14,6 +14,7 @@ AgentGuard does not custody user wallet keys, seed phrases, or transaction-signi
 | Key class | Purpose | Private key owner |
 |---|---|---|
 | Policy issuer | Sign immutable policy bundles | Policy administrator's trusted signing boundary |
+| Authorization attestation issuer | Attest a verified deterministic ALLOW result and its exact input/evidence binding | Isolated authorization-attestation boundary; not the runtime coordinator and not the permit signer |
 | Permit signer | Sign short-lived ALLOW permits | Isolated AgentGuard permit-signing service |
 | Evidence checkpoint | Sign exported evidence checkpoints | Independent evidence administration boundary |
 | Context attestation | Attest context observations | External context provider |
