@@ -21,6 +21,7 @@
 - Altering any signed claim invalidates signature or exact-binding verification.
 - Expired/future-dated attestation and challenge nonce are rejected.
 - Challenge token signature, signer key purpose, pending-request digest, tenant, and action/policy/context binding are verified.
+- Challenge token is carried in PermitEnvelopeV2; enforcement verifies its signature, digest, expiry, and ordering against attestation issue time.
 - Challenge nonce is single-use under concurrent requests and cannot be replayed for another signing request.
 
 ## 3. PermitEnvelopeV2 binding
