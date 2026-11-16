@@ -1,4 +1,4 @@
-//! Shared domain types and cryptographic protocol primitives for AIVO AgentGuard.
+//! Shared domain types and cryptographic protocol primitives for AIVO `AgentGuard`.
 //!
 //! This crate contains deterministic, side-effect-free primitives. It does not
 //! hold signing keys, perform authorization orchestration, or execute actions.
