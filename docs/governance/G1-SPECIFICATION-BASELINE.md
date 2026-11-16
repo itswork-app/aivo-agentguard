@@ -33,7 +33,7 @@ G1 turns the G0 product and architecture direction into a coherent, testable con
 - EVIDENCE-FORMAT: event envelope and integrity.
 - API-CONTRACT-V1: transport-neutral API surface.
 - SECURITY-REQUIREMENTS: security invariants.
-- ADR-0002 through ADR-0005: policy combining, canonicalization, evidence, and approval/permit decisions.
+- ADR-0001 through ADR-0005: deterministic authorization core, policy combining, canonicalization, evidence, and approval/permit decisions.
 - ACCEPTANCE-TEST-PLAN and REQUIREMENTS-TRACEABILITY: verification plan.
 
 ## Freeze criteria
