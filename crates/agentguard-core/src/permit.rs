@@ -332,10 +332,7 @@ impl PermitEnvelopeV2 {
     ///
     /// Returns an error for invalid envelope shape, canonicalization failure,
     /// key ID mismatch, or invalid Ed25519 signature.
-    pub fn verify_outer_signature(
-        &self,
-        public_key: &[u8; 32],
-    ) -> Result<(), PermitEnvelopeError> {
+    pub fn verify_outer_signature(&self, public_key: &[u8; 32]) -> Result<(), PermitEnvelopeError> {
         self.validate_shape()?;
         let message = self
             .signing_message()
@@ -443,7 +440,10 @@ mod tests {
     fn rejects_g1_non_allow_and_lifetime_escalation() {
         let mut invalid = permit();
         invalid.decision = Decision::Deny;
-        assert_eq!(invalid.validate(), Err(ProtocolShapeError::DecisionNotAllowed));
+        assert_eq!(
+            invalid.validate(),
+            Err(ProtocolShapeError::DecisionNotAllowed)
+        );
 
         let mut invalid = permit();
         invalid.expires_at = "2026-11-17T10:01:01Z".into();
