@@ -22,8 +22,10 @@ pub use protocol::{
     SigningChallengeV1,
 };
 pub use revocation::{
-    RevocationEntryV1, RevocationError, RevocationHighWaterMark, RevocationSnapshotV1,
-    RevocationStatus, RevocationSubjectType, SignedRevocationSnapshotV1, validate_progression,
+    RevocationEntryV1, RevocationError, RevocationHighWaterMark, RevocationHighWaterMarkStore,
+    RevocationPersistenceError, RevocationSnapshotV1, RevocationStatus, RevocationStoreError,
+    RevocationSubjectType, SignedRevocationSnapshotV1, persist_verified_snapshot,
+    validate_progression,
 };
 
 #[cfg(test)]
