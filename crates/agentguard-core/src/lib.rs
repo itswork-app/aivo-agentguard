@@ -16,10 +16,11 @@ pub use permit::{
     PolicyProvenanceV1,
 };
 pub use protocol::{
-    AttestationVerificationError, AuthorizationAttestationV1, ChallengeVerificationError, Decision,
-    DecisionEventRef, EvidenceReceiptRef, KeyPurpose, ProtocolShapeError, SignatureAlgorithm,
-    SignatureEnvelope, SignedAuthorizationAttestationV1, SignedSigningChallengeV1,
-    SigningChallengeV1,
+    AttestationVerificationError, AuthorizationAttestationV1, ChallengeConsumptionError,
+    ChallengeConsumptionV1, ChallengeReplayStore, ChallengeReplayStoreError,
+    ChallengeVerificationError, Decision, DecisionEventRef, EvidenceReceiptRef, KeyPurpose,
+    ProtocolShapeError, SignatureAlgorithm, SignatureEnvelope, SignedAuthorizationAttestationV1,
+    SignedSigningChallengeV1, SigningChallengeV1, consume_attested_challenge,
 };
 pub use revocation::{
     RevocationEntryV1, RevocationError, RevocationHighWaterMark, RevocationHighWaterMarkStore,
