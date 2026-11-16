@@ -43,6 +43,9 @@
 - `next_update - this_update` above 60 seconds is rejected.
 - Future timestamps beyond 5 seconds are rejected.
 - Lower sequence, epoch rollback, or loss of persisted high-water mark stops enforcement.
+- Same sequence with identical canonical snapshot digest is idempotent; same sequence with different digest is rejected.
+- `this_update` rollback within an epoch and `issued_at > this_update` are rejected.
+- Missing exact subject entry and wildcard/default status rules are rejected.
 - ACTIVE -> REVOKED or COMPROMISED after permit issuance causes enforcement rejection.
 - RETIRED key cannot sign new artifacts; previously issued unexpired artifact behavior follows the specified transition rule.
 - Revocation service outage, network partition, stale cache, or unavailable status rejects before side effect.
