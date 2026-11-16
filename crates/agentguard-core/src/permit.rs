@@ -64,10 +64,10 @@ impl AuthorizationPermitV1 {
             &self.action_digest,
             &self.policy_digest,
             &self.context_digest,
-            &self.nonce,
         ] {
             validate_hex_digest(value)?;
         }
+        validate_identifier(&self.nonce)?;
         validate_lifetime(&self.issued_at, &self.expires_at, 60)
     }
 
