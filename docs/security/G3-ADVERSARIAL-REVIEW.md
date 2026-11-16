@@ -3,7 +3,7 @@
 **Review type:** AI-assisted adversarial design review  
 **Review date:** 2026-11-16  
 **Reviewed scope:** G3 Authorization Attestation, PermitEnvelopeV2, Revocation Status Protocol, ADR-0008/0009, acceptance tests, and traceability  
-**Status:** Conditional pass for Draft review; not approved for implementation or production  
+**Status:** Conditional pass for specification baseline freeze; implementation and production gates remain  
 **Limitations:** This is a second-pass review in the same project workflow, not a third-party audit, cryptographic implementation audit, penetration test, or certification.
 
 ## 1. Executive assessment
@@ -68,16 +68,19 @@ The documents are still proposals. Passing repository CI validates the existing 
 - **Disposition:** Addressed. G3 domain-separator notation is normalized to the single backslash-zero escape convention used by the frozen G1 canonicalization ADR. Golden vectors remain mandatory before implementation.
 - **Verification:** Golden byte-level vectors must assert the exact UTF-8 prefix including one trailing NUL byte.
 
-## 3. Residual design questions
+## 3. Product Owner decisions and implementation gates
 
-These are intentionally open and must be resolved before G3 is frozen:
-- Whether high-assurance profiles require a separately implemented evaluator to reduce common-mode defects.
-- Single-signer versus threshold-signed revocation snapshots for OSS and enterprise deployment.
-- Reproducible-build and evaluator artifact provenance format.
-- Evidence receipt signing and storage trust topology.
-- Trusted clock and rollback-resistant high-water-mark storage implementation.
+The Product Owner approved all five G3 recommendations on 2026-11-17. The approved choices are recorded in `governance/G3-OPEN-DECISIONS.md` and incorporated into the G3 v0.1.0 baseline. No product-level decision remains open in that register.
 
-No residual question permits weakening fail-closed behavior.
+The following remain implementation and release gates, not unresolved specification choices:
+- Implement and test isolated verifier deployment and evaluator artifact allowlisting.
+- Implement revocation signer isolation, offline recovery, and enterprise threshold-authorization capability.
+- Verify signed provenance against the owner-approved artifact manifest.
+- Implement durable evidence receipts, read-back verification, and documented replication/backup/restore semantics.
+- Integrate trusted UTC time, monotonic elapsed-time measurement, and rollback-resistant high-water-mark storage.
+- Produce byte-exact golden vectors, including NUL-terminated domain-separator prefixes.
+
+No implementation gate permits weakening fail-closed behavior.
 
 ## 4. Review limitations
 
@@ -91,6 +94,6 @@ This review did not:
 
 ## 5. Recommendation
 
-**CONDITIONAL PASS for continued Draft review only.** The identified specification findings are addressed in the current branch. Do not mark G3 ready for implementation, merge it as an approved normative baseline, or enable production enforcement until the open design questions are resolved, Product Owner approval is recorded, and implementation-level tests/golden vectors exist.
+**CONDITIONAL PASS for G3 specification baseline freeze.** The identified specification findings are addressed, and Product Owner approval of all five design decisions is recorded. This review does not validate an implementation. G3 may proceed to implementation planning and review, but production enforcement remains prohibited until implementation-level tests/golden vectors, operational controls, and the required external independent security review are complete.
 
 This review is AI-assisted and must not be represented as an external independent audit or certification.
