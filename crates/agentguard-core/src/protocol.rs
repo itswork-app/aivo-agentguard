@@ -3,8 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    CanonicalizationError, SignatureEnvelope, canonical_json, domain_digest, hex_digest,
-    verify_ed25519,
+    CanonicalizationError, canonical_json, domain_digest, hex_digest, verify_ed25519,
 };
 
 /// Authorization outcomes at the policy boundary.
