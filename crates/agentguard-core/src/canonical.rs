@@ -8,7 +8,7 @@ use thiserror::Error;
 #[derive(Debug, Error)]
 pub enum CanonicalizationError {
     #[error("RFC 8785 canonicalization failed: {0}")]
-    Jcs(#[from] serde_jcs::Error),
+    Jcs(#[from] serde_json::Error),
 }
 
 /// Serialize a validated protocol value using RFC 8785 JSON Canonicalization.
