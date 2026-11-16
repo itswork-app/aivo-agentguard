@@ -57,6 +57,7 @@ The signed canonical payload MUST contain exactly these fields for version 1; un
 | `issued_at` | Trusted UTC timestamp |
 | `expires_at` | UTC timestamp; maximum 30 seconds after issue |
 | `challenge_nonce` | Cryptographically random, single-use challenge from permit signer |
+| `challenge_digest` | Digest of the permit signer's authenticated challenge token |
 
 The signature is Ed25519 over the canonical payload prefixed with the fixed domain separator `AIVO-AGENTGUARD-AUTH-ATTESTATION-V1\\0`. The signature envelope contains `algorithm = Ed25519`, `key_id`, and unpadded base64url signature. Algorithm negotiation is prohibited.
 
@@ -68,9 +69,11 @@ The attestation issuer MUST verify the receipt signature and exact field equalit
 
 ## 5. Challenge and replay controls
 
-The permit signer issues a short-lived unpredictable challenge nonce bound to a pending signing request. The attestation issuer includes it in the attestation. The signer atomically consumes the challenge on successful verification and rejects duplicate, expired, unknown, or mismatched challenges. Challenge lifetime MUST NOT exceed 30 seconds. The nonce is not a substitute for the permit's own single-use consumption.
+Before attestation issuance, the permit signer creates a signed challenge token containing a unique challenge ID, unpredictable nonce, pending signing-request digest, tenant ID, request/action/policy/context digests, issue/expiry timestamps, and signer key ID. The token is signed with the permit-signing purpose and is verified by the attestation issuer against the configured signer trust root. The challenge token MUST NOT contain private data beyond the minimum identifiers and digests.
 
-The attestation MUST be bound to the exact claims that will appear in the G1 permit and G3 envelope. Any difference in tenant, principal, agent, request, action, policy, context, decision, evaluator version, or evidence reference rejects signing.
+The attestation includes the nonce and digest of the complete canonical challenge token. The challenge is bound server-side to one pending signing request and its exact expected claims; the issuer MUST reject a challenge whose binding does not match the independently recomputed ALLOW result. The permit signer atomically consumes the challenge on successful attestation verification and rejects duplicate, expired, unknown, or mismatched challenges. Challenge lifetime MUST NOT exceed 30 seconds. The nonce is not a substitute for the permit's own single-use consumption.
+
+The attestation MUST be bound to the exact claims that will appear in the G1 permit and G3 envelope. Any difference in tenant, principal, agent, request, action, policy, context, decision, evaluator version, evidence reference, or challenge binding rejects signing.
 
 ## 6. Verification and failure behavior
 
