@@ -211,6 +211,28 @@ impl SignedSigningChallengeV1 {
         Ok(())
     }
 
+    /// Build the exact signed message for the challenge claims.
+    pub fn signing_message(&self) -> Result<Vec<u8>, CanonicalizationError> {
+        let canonical = canonical_json(&self.claims)?;
+        let mut message = b"AIVO-AGENTGUARD-SIGNING-CHALLENGE-V1\0".to_vec();
+        message.extend_from_slice(&canonical);
+        Ok(message)
+    }
+
+    /// Verify the challenge signature using a caller-resolved permit-purpose key.
+    pub fn verify_signature(
+        &self,
+        public_key: &[u8; 32],
+    ) -> Result<(), ChallengeVerificationError> {
+        self.validate_shape()
+            .map_err(ChallengeVerificationError::InvalidShape)?;
+        let message = self
+            .signing_message()
+            .map_err(ChallengeVerificationError::Canonicalization)?;
+        verify_ed25519(public_key, &self.signature, &message)
+            .map_err(ChallengeVerificationError::Crypto)
+    }
+
     /// Digest the complete canonical challenge token including its signature envelope.
     pub fn digest(&self) -> Result<[u8; 32], CanonicalizationError> {
         let bytes = canonical_json(self)?;
@@ -274,7 +296,7 @@ impl SignedAuthorizationAttestationV1 {
     /// Build the exact signed message for the attestation claims.
     pub fn signing_message(&self) -> Result<Vec<u8>, CanonicalizationError> {
         let canonical = canonical_json(&self.claims)?;
-        let mut message = b"AIVO-AGENTGUARD-AUTH-ATTESTATION-V1\\0".to_vec();
+        let mut message = b"AIVO-AGENTGUARD-AUTH-ATTESTATION-V1\0".to_vec();
         message.extend_from_slice(&canonical);
         Ok(message)
     }
