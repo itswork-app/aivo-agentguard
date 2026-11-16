@@ -20,7 +20,8 @@
 - Golden vectors reproduce the attestation digest and signature input exactly.
 - Altering any signed claim invalidates signature or exact-binding verification.
 - Expired/future-dated attestation and challenge nonce are rejected.
-- Challenge nonce is single-use under concurrent requests.
+- Challenge token signature, signer key purpose, pending-request digest, tenant, and action/policy/context binding are verified.
+- Challenge nonce is single-use under concurrent requests and cannot be replayed for another signing request.
 
 ## 3. PermitEnvelopeV2 binding
 
@@ -37,7 +38,7 @@
 
 - Valid signed fresh snapshot is accepted.
 - Invalid signature, unknown registry, unknown subject, missing required entry, malformed entry, duplicate subject, and unsupported schema fail closed.
-- Snapshot age at 29 seconds is accepted if all other bounds pass; age at 30 seconds boundary follows the strict implementation rule; age above 30 seconds is rejected.
+- Snapshot age at 29 seconds and exactly 30 seconds is accepted if all other bounds pass; age greater than 30 seconds is rejected.
 - `next_update - this_update` above 60 seconds is rejected.
 - Future timestamps beyond 5 seconds are rejected.
 - Lower sequence, epoch rollback, or loss of persisted high-water mark stops enforcement.
