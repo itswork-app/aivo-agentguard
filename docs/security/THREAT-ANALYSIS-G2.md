@@ -40,6 +40,8 @@ This analysis uses assets, trust boundaries, attacker capabilities, attack paths
 4. Approval quorum must use distinct, eligible identities and immutable profile versions.
 5. Key revocation must propagate before compromised keys can authorize new actions.
 6. Evidence append must be durable before permit issuance.
+7. The permit signer must verify a cryptographically authenticated, exact-action-bound authorization attestation; a compromised runtime must not turn an arbitrary `ALLOW` field into a signed permit.
+8. Key and issuer revocation state must be fresh at signing and enforcement; stale or unavailable revocation state fails closed.
 7. Adapter bypass and TOCTOU behavior must be assessed per integration.
 
 ## 4. Abuse cases
