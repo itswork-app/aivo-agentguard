@@ -431,14 +431,14 @@ pub enum AttestationVerificationError {
     Crypto(#[from] crate::CryptoError),
 }
 
-fn validate_identifier(value: &str) -> Result<(), ProtocolShapeError> {
+pub(crate) fn validate_identifier(value: &str) -> Result<(), ProtocolShapeError> {
     if value.is_empty() || value.trim() != value || value.len() > 256 {
         return Err(ProtocolShapeError::InvalidIdentifier);
     }
     Ok(())
 }
 
-fn validate_hex_digest(value: &str) -> Result<(), ProtocolShapeError> {
+pub(crate) fn validate_hex_digest(value: &str) -> Result<(), ProtocolShapeError> {
     if value.len() != 64
         || !value
             .bytes()
@@ -450,7 +450,7 @@ fn validate_hex_digest(value: &str) -> Result<(), ProtocolShapeError> {
 }
 
 /// Accepts canonical UTC whole-second timestamps and validates calendar fields.
-fn parse_timestamp(value: &str) -> Result<i64, ProtocolShapeError> {
+pub(crate) fn parse_timestamp(value: &str) -> Result<i64, ProtocolShapeError> {
     let bytes = value.as_bytes();
     if bytes.len() != 20
         || bytes[4] != b'-'
@@ -507,7 +507,7 @@ fn parse_timestamp(value: &str) -> Result<i64, ProtocolShapeError> {
     Ok(days * 86_400 + hour * 3_600 + minute * 60 + second)
 }
 
-fn validate_lifetime(
+pub(crate) fn validate_lifetime(
     issued_at: &str,
     expires_at: &str,
     max_seconds: u64,
