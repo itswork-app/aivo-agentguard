@@ -1,4 +1,4 @@
-//! Shared domain types for AIVO AgentGuard.
+//! Shared domain types for AIVO `AgentGuard`.
 //!
 //! This crate is scaffolding. Public contracts are provisional until their
 //! corresponding specifications are approved.
