@@ -56,10 +56,10 @@ The signed canonical payload MUST contain exactly these fields for version 1; un
 | `evidence_receipt_ref` | Durable append receipt identifier and digest |
 | `issued_at` | Trusted UTC timestamp |
 | `expires_at` | UTC timestamp; maximum 30 seconds after issue |
-| `challenge_nonce` | Cryptographically random, single-use challenge from permit signer |
+| `challenge_nonce` | Cryptographically random, single-use 256-bit challenge from permit signer |
 | `challenge_digest` | Digest of the permit signer's authenticated challenge token |
 
-The signature is Ed25519 over the canonical payload prefixed with the fixed domain separator `AIVO-AGENTGUARD-AUTH-ATTESTATION-V1\\0`. The attestation's `challenge_nonce` and `challenge_digest` MUST match the verified challenge token exactly. The signature envelope contains `algorithm = Ed25519`, `key_id`, and unpadded base64url signature. Algorithm negotiation is prohibited.
+The signature is Ed25519 over the canonical payload prefixed with the fixed domain separator `AIVO-AGENTGUARD-AUTH-ATTESTATION-V1\0`. The attestation's `challenge_nonce` and `challenge_digest` MUST match the verified challenge token exactly. The signature envelope contains `algorithm = Ed25519`, `key_id`, and unpadded base64url signature. Algorithm negotiation is prohibited.
 
 ## 4. Evidence receipt requirements
 
@@ -69,7 +69,7 @@ The attestation issuer MUST verify the receipt signature and exact field equalit
 
 ## 5. Challenge and replay controls
 
-Before attestation issuance, the permit signer creates a signed `SigningChallengeV1` token containing exactly: `schema_version`, `challenge_id`, `nonce`, `pending_signing_request_digest`, `tenant_id`, `request_digest`, `action_digest`, `policy_digest`, `context_digest`, `issued_at`, `expires_at`, and `signer_key_id`. Unknown fields are rejected. The token signature is Ed25519 over canonical claims prefixed with `AIVO-AGENTGUARD-SIGNING-CHALLENGE-V1\\0`; the signature envelope uses the fixed Ed25519 algorithm and the same key ID. The token is signed with the permit-signing purpose and verified by the attestation issuer against the configured signer trust root. It MUST NOT contain private data beyond the minimum identifiers and digests.
+Before attestation issuance, the permit signer creates a signed `SigningChallengeV1` token containing exactly: `schema_version`, `challenge_id`, `nonce`, `pending_signing_request_digest`, `tenant_id`, `request_digest`, `action_digest`, `policy_digest`, `context_digest`, `issued_at`, `expires_at`, and `signer_key_id`. Unknown fields are rejected. The token signature is Ed25519 over canonical claims prefixed with `AIVO-AGENTGUARD-SIGNING-CHALLENGE-V1\0`; the signature envelope uses the fixed Ed25519 algorithm and the same key ID. The token is signed with the permit-signing purpose and verified by the attestation issuer against the configured signer trust root. It MUST NOT contain private data beyond the minimum identifiers and digests.
 
 The attestation includes the nonce and digest of the complete canonical challenge token plus signature envelope. The challenge is bound to one pending signing request and exact expected claims; the issuer MUST reject a challenge whose binding does not match the independently recomputed ALLOW result. The permit signer atomically consumes the challenge on successful attestation verification and rejects duplicate, expired, unknown, or mismatched challenges. Challenge lifetime MUST NOT exceed 30 seconds. The nonce is not a substitute for the permit's own single-use consumption.
 
