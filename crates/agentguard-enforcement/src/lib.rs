@@ -224,9 +224,41 @@ where
 {
     let now_utc = clock.now_utc()?;
     envelope.validate_at(&now_utc)?;
+    validate_expected_context(envelope, expected)?;
 
+    let verification_keys = resolve_envelope_keys(envelope, keys)?;
+    let snapshot = verify_current_revocation(
+        envelope,
+        keys,
+        revocation_source,
+        high_water_store,
+        &now_utc,
+    )?;
+
+    require_envelope_subjects_active(envelope, &snapshot)?;
+    envelope.verify_all_signatures(
+        &verification_keys.permit.public_key,
+        &verification_keys.challenge.public_key,
+        &verification_keys.attestation.public_key,
+        &verification_keys.outer.public_key,
+    )?;
+
+    consume_permit(envelope, expected, permit_store, &now_utc)
+}
+
+struct EnvelopeVerificationKeys {
+    permit: ResolvedVerificationKey,
+    challenge: ResolvedVerificationKey,
+    attestation: ResolvedVerificationKey,
+    outer: ResolvedVerificationKey,
+}
+
+fn validate_expected_context(
+    envelope: &PermitEnvelopeV2,
+    expected: &ExpectedExecutionContextV1,
+) -> Result<(), EnforcementError> {
     let permit = &envelope.permit_claims_v1;
-    let attestation_claims = &envelope.authorization_attestation_v1.claims;
+    let attestation = &envelope.authorization_attestation_v1.claims;
     if permit.tenant_id != expected.tenant_id
         || permit.principal_id != expected.principal_id
         || permit.agent_id != expected.agent_id
@@ -236,103 +268,128 @@ where
         || permit.policy_version != expected.policy_version
         || permit.policy_digest != expected.policy_digest
         || permit.context_digest != expected.context_digest
-        || attestation_claims.request_digest != expected.request_digest
-        || attestation_claims.action_digest != expected.action_digest
-        || attestation_claims.context_digest != expected.context_digest
+        || attestation.request_digest != expected.request_digest
+        || attestation.action_digest != expected.action_digest
+        || attestation.context_digest != expected.context_digest
     {
         return Err(EnforcementError::ExecutionContextMismatch);
     }
+    Ok(())
+}
 
-    let permit_key = resolve_key(
-        keys,
-        &envelope.permit_signature_v1.key_id,
-        KeyPurpose::PermitSigner,
-    )?;
-    let challenge_key = resolve_key(
-        keys,
-        &envelope.signing_challenge_v1.signature.key_id,
-        KeyPurpose::PermitSigner,
-    )?;
-    let attestation_key = resolve_key(
-        keys,
-        &envelope.authorization_attestation_v1.signature.key_id,
-        KeyPurpose::AuthorizationAttestationIssuer,
-    )?;
-    let outer_key = resolve_key(
-        keys,
-        &envelope.envelope_signature.key_id,
-        KeyPurpose::PermitSigner,
-    )?;
+fn resolve_envelope_keys<K: VerificationKeyResolver>(
+    envelope: &PermitEnvelopeV2,
+    keys: &K,
+) -> Result<EnvelopeVerificationKeys, EnforcementError> {
+    Ok(EnvelopeVerificationKeys {
+        permit: resolve_key(
+            keys,
+            &envelope.permit_signature_v1.key_id,
+            KeyPurpose::PermitSigner,
+        )?,
+        challenge: resolve_key(
+            keys,
+            &envelope.signing_challenge_v1.signature.key_id,
+            KeyPurpose::PermitSigner,
+        )?,
+        attestation: resolve_key(
+            keys,
+            &envelope.authorization_attestation_v1.signature.key_id,
+            KeyPurpose::AuthorizationAttestationIssuer,
+        )?,
+        outer: resolve_key(
+            keys,
+            &envelope.envelope_signature.key_id,
+            KeyPurpose::PermitSigner,
+        )?,
+    })
+}
 
-    let registry_id = revocation_source.registry_id();
-    let signed_snapshot = revocation_source.current_snapshot()?;
+fn verify_current_revocation<K, R, H>(
+    envelope: &PermitEnvelopeV2,
+    keys: &K,
+    source: &R,
+    high_water_store: &H,
+    now_utc: &str,
+) -> Result<SignedRevocationSnapshotV1, EnforcementError>
+where
+    K: VerificationKeyResolver,
+    R: RevocationSnapshotSource,
+    H: RevocationHighWaterMarkStore,
+{
+    let registry_id = source.registry_id();
+    let snapshot = source.current_snapshot()?;
     let revocation_key = resolve_key(
         keys,
-        &signed_snapshot.signature.key_id,
+        &snapshot.signature.key_id,
         KeyPurpose::RevocationAuthority,
     )?;
     persist_verified_snapshot(
         high_water_store,
-        &signed_snapshot,
+        &snapshot,
         &revocation_key.public_key,
         registry_id,
-        &now_utc,
+        now_utc,
     )?;
+    require_envelope_subjects_active(envelope, &snapshot)?;
+    Ok(snapshot)
+}
 
-    let claims = &envelope.authorization_attestation_v1.claims;
-    require_active(
-        &signed_snapshot,
-        RevocationSubjectType::PermitSignerKey,
-        &envelope.permit_signature_v1.key_id,
-    )?;
-    require_active(
-        &signed_snapshot,
-        RevocationSubjectType::PermitSignerKey,
-        &envelope.signing_challenge_v1.signature.key_id,
-    )?;
-    require_active(
-        &signed_snapshot,
-        RevocationSubjectType::PermitSignerKey,
-        &envelope.envelope_signature.key_id,
-    )?;
-    require_active(
-        &signed_snapshot,
-        RevocationSubjectType::AttestationIssuer,
-        &claims.issuer_id,
-    )?;
-    require_active(
-        &signed_snapshot,
-        RevocationSubjectType::AttestationIssuerKey,
-        &claims.issuer_key_id,
-    )?;
-    require_active(
-        &signed_snapshot,
-        RevocationSubjectType::PolicyIssuer,
-        &claims.policy_issuer_id,
-    )?;
-    require_active(
-        &signed_snapshot,
-        RevocationSubjectType::PolicyIssuerKey,
-        &claims.policy_signing_key_id,
-    )?;
-    require_active(
-        &signed_snapshot,
-        RevocationSubjectType::Policy,
-        &claims.policy_digest,
-    )?;
+fn require_envelope_subjects_active(
+    envelope: &PermitEnvelopeV2,
+    snapshot: &SignedRevocationSnapshotV1,
+) -> Result<(), EnforcementError> {
+    let attestation = &envelope.authorization_attestation_v1.claims;
+    for (subject_type, subject_id) in [
+        (
+            RevocationSubjectType::PermitSignerKey,
+            envelope.permit_signature_v1.key_id.as_str(),
+        ),
+        (
+            RevocationSubjectType::PermitSignerKey,
+            envelope.signing_challenge_v1.signature.key_id.as_str(),
+        ),
+        (
+            RevocationSubjectType::PermitSignerKey,
+            envelope.envelope_signature.key_id.as_str(),
+        ),
+        (
+            RevocationSubjectType::AttestationIssuer,
+            attestation.issuer_id.as_str(),
+        ),
+        (
+            RevocationSubjectType::AttestationIssuerKey,
+            attestation.issuer_key_id.as_str(),
+        ),
+        (
+            RevocationSubjectType::PolicyIssuer,
+            attestation.policy_issuer_id.as_str(),
+        ),
+        (
+            RevocationSubjectType::PolicyIssuerKey,
+            attestation.policy_signing_key_id.as_str(),
+        ),
+        (
+            RevocationSubjectType::Policy,
+            attestation.policy_digest.as_str(),
+        ),
+    ] {
+        require_active(snapshot, subject_type, subject_id)?;
+    }
+    Ok(())
+}
 
-    envelope.verify_all_signatures(
-        &permit_key.public_key,
-        &challenge_key.public_key,
-        &attestation_key.public_key,
-        &outer_key.public_key,
-    )?;
-
+fn consume_permit<P: PermitConsumptionStore>(
+    envelope: &PermitEnvelopeV2,
+    expected: &ExpectedExecutionContextV1,
+    permit_store: &P,
+    now_utc: &str,
+) -> Result<ConsumedPermitV2, EnforcementError> {
+    let permit = &envelope.permit_claims_v1;
     let envelope_digest = envelope
         .digest()
         .map_err(|error| PermitEnvelopeError::Canonicalization(error.to_string()))?;
     let envelope_digest = agentguard_core::hex_digest(&envelope_digest);
-    let permit = &envelope.permit_claims_v1;
     let record = PermitConsumptionRecordV1 {
         tenant_id: permit.tenant_id.clone(),
         permit_id: permit.permit_id.clone(),
@@ -344,7 +401,7 @@ where
         envelope_digest: envelope_digest.clone(),
         expires_at: envelope.expires_at.clone(),
     };
-    permit_store.consume_once(&record, &now_utc)?;
+    permit_store.consume_once(&record, now_utc)?;
 
     Ok(ConsumedPermitV2 {
         tenant_id: permit.tenant_id.clone(),
