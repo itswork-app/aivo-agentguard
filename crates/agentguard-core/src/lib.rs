@@ -11,10 +11,10 @@ mod revocation;
 pub use canonical::{CanonicalizationError, canonical_json, domain_digest, hex_digest};
 pub use crypto::{CryptoError, verify_ed25519};
 pub use protocol::{
-    AttestationVerificationError, AuthorizationAttestationV1, ChallengeVerificationError,
-    Decision, DecisionEventRef, EvidenceReceiptRef, KeyPurpose, ProtocolShapeError,
-    SignatureAlgorithm, SignatureEnvelope, SignedAuthorizationAttestationV1,
-    SignedSigningChallengeV1, SigningChallengeV1,
+    AttestationVerificationError, AuthorizationAttestationV1, ChallengeVerificationError, Decision,
+    DecisionEventRef, EvidenceReceiptRef, KeyPurpose, ProtocolShapeError, SignatureAlgorithm,
+    SignatureEnvelope, SignedAuthorizationAttestationV1, SignedSigningChallengeV1,
+    SigningChallengeV1,
 };
 pub use revocation::{
     RevocationEntryV1, RevocationError, RevocationHighWaterMark, RevocationSnapshotV1,
