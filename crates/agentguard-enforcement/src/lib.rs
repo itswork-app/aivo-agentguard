@@ -331,7 +331,6 @@ where
         registry_id,
         now_utc,
     )?;
-    require_envelope_subjects_active(envelope, &snapshot)?;
     Ok(snapshot)
 }
 
