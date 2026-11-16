@@ -1,6 +1,6 @@
 # ADR-0009: Versioned Permit Envelope and Revocation Snapshots
 
-- **Status:** Proposed — G3 review required
+- **Status:** Accepted — G3 v0.1.0
 - **Date:** 2026-11-16
 - **Decision owners:** Project maintainer
 
