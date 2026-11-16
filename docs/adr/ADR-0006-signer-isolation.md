@@ -10,7 +10,7 @@ The deterministic evaluator should be small, reproducible, and free of secret-be
 
 ## Proposed decision
 
-The policy evaluator never holds private signing keys. Policy bundle signing, permit signing, and evidence checkpoint signing are separate key purposes and separate service boundaries. The permit signer accepts only a narrowly typed signing request after runtime validation and durable decision evidence.
+The policy evaluator never holds private signing keys. Policy bundle signing, permit signing, and evidence checkpoint signing are separate key purposes and separate service boundaries. The permit signer accepts only a narrowly typed signing request after runtime validation and durable decision evidence. A runtime-supplied decision field alone is not sufficient: the signer must verify a cryptographically authenticated authorization attestation, exact claim binding, issuer trust status, and freshness before signing. The attestation issuer and protocol are G3 contract work; production signing is prohibited until that contract is specified and reviewed.
 
 ## Consequences
 
