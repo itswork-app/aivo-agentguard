@@ -17,7 +17,14 @@ Use RFC 8785 JSON Canonicalization Scheme for canonical JSON structures, with st
 - Strings are validated as Unicode and are not locale-folded during authorization.
 - Unknown fields are rejected in security-critical schema versions unless explicitly declared as extension data.
 
-Compute SHA-256 over domain-separated canonical bytes for request, action, policy, permit, and evidence digests. Each digest type uses a distinct fixed domain separator.
+Compute SHA-256 over domain-separated canonical bytes. Version 1 domain separators are fixed UTF-8 byte strings, including the trailing NUL byte:
+- `AIVO-AGENTGUARD-REQUEST-V1\0`
+- `AIVO-AGENTGUARD-ACTION-V1\0`
+- `AIVO-AGENTGUARD-POLICY-V1\0`
+- `AIVO-AGENTGUARD-PERMIT-V1\0`
+- `AIVO-AGENTGUARD-EVENT-V1\0`
+
+The digest is SHA-256(domain separator || canonical bytes). Signatures cover canonical claims or canonical policy bytes, not transport encodings. Signature envelopes identify the fixed algorithm (`Ed25519`), key ID, and base64url-encoded signature. Algorithm negotiation is not permitted in v1.
 
 ## Consequences
 
