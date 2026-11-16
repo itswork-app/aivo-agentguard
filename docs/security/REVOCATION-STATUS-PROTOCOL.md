@@ -58,7 +58,7 @@ Consumers MUST verify:
 - `issued_at <= now + 5 seconds`;
 - `this_update <= now + 5 seconds`;
 - `now <= next_update`;
-- `now - this_update <= 30 seconds`;
+- `now - this_update <= 30 seconds` (exactly 30 seconds is accepted; any greater age is rejected);
 - `next_update - this_update <= 60 seconds`;
 - sequence is not lower than the highest previously accepted sequence for the registry epoch;
 - registry epoch is trusted and cannot be reset by an untrusted response;
@@ -87,5 +87,7 @@ A status cache is acceptable only while the signed snapshot remains within all f
 - A status cannot be downgraded or removed by omission. Removal requires a new registry epoch established through an out-of-band recovery procedure and audited administrative event.
 
 ## 7. Operational controls and residual risks
+
+The revocation authority signing key is itself a trust root and MUST NOT be considered revocable solely by a snapshot signed by that same key. Bootstrap and emergency replacement require an out-of-band root procedure, a separately controlled recovery key or threshold authority, and an audited registry-epoch transition. The recovery trust anchor must be provisioned independently by each enforcement deployment.
 
 Revocation authority key compromise can undermine status distribution. Use isolated keys, dual-control administrative workflows, immutable audit events, and documented emergency rotation. A stale or unavailable control plane reduces availability by design. This protocol does not promise uninterrupted offline execution.
