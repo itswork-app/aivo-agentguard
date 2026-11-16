@@ -2,7 +2,10 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::{CanonicalizationError, SignatureEnvelope, canonical_json, domain_digest};
+use crate::{
+    CanonicalizationError, SignatureEnvelope, canonical_json, domain_digest, hex_digest,
+    verify_ed25519,
+};
 
 /// Authorization outcomes at the policy boundary.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -267,6 +270,70 @@ impl SignedAuthorizationAttestationV1 {
         }
         Ok(())
     }
+
+    /// Build the exact signed message for the attestation claims.
+    pub fn signing_message(&self) -> Result<Vec<u8>, CanonicalizationError> {
+        let canonical = canonical_json(&self.claims)?;
+        let mut message = b"AIVO-AGENTGUARD-AUTH-ATTESTATION-V1\\0".to_vec();
+        message.extend_from_slice(&canonical);
+        Ok(message)
+    }
+
+    /// Verify the attestation signature using a caller-resolved issuer-purpose key.
+    pub fn verify_signature(&self, public_key: &[u8; 32]) -> Result<(), AttestationVerificationError> {
+        self.validate_shape().map_err(AttestationVerificationError::InvalidShape)?;
+        let message = self.signing_message().map_err(AttestationVerificationError::Canonicalization)?;
+        verify_ed25519(public_key, &self.signature, &message)
+            .map_err(AttestationVerificationError::Crypto)
+    }
+
+    /// Require exact challenge, tenant, request, action, policy and context binding.
+    pub fn validate_challenge_binding(
+        &self,
+        challenge: &SignedSigningChallengeV1,
+    ) -> Result<(), ProtocolShapeError> {
+        self.validate_shape()?;
+        challenge.validate_shape()?;
+        let challenge_digest = challenge.digest().map_err(|_| ProtocolShapeError::ChallengeBindingMismatch)?;
+        let challenge_digest_hex = hex_digest(&challenge_digest);
+        let c = &challenge.claims;
+        let a = &self.claims;
+        if a.challenge_nonce != c.nonce
+            || a.challenge_digest != challenge_digest_hex
+            || a.tenant_id != c.tenant_id
+            || a.request_digest != c.request_digest
+            || a.action_digest != c.action_digest
+            || a.policy_digest != c.policy_digest
+            || a.context_digest != c.context_digest
+            || a.issued_at < c.issued_at
+            || a.issued_at > c.expires_at
+        {
+            return Err(ProtocolShapeError::ChallengeBindingMismatch);
+        }
+        Ok(())
+    }
+}
+
+/// Errors verifying a signed challenge token.
+#[derive(Debug, thiserror::Error)]
+pub enum ChallengeVerificationError {
+    #[error("challenge shape is invalid: {0}")]
+    InvalidShape(#[from] ProtocolShapeError),
+    #[error("challenge canonicalization failed: {0}")]
+    Canonicalization(#[from] CanonicalizationError),
+    #[error("challenge signature verification failed: {0}")]
+    Crypto(#[from] crate::CryptoError),
+}
+
+/// Errors verifying a signed authorization attestation.
+#[derive(Debug, thiserror::Error)]
+pub enum AttestationVerificationError {
+    #[error("attestation shape is invalid: {0}")]
+    InvalidShape(#[from] ProtocolShapeError),
+    #[error("attestation canonicalization failed: {0}")]
+    Canonicalization(#[from] CanonicalizationError),
+    #[error("attestation signature verification failed: {0}")]
+    Crypto(#[from] crate::CryptoError),
 }
 
 fn validate_identifier(value: &str) -> Result<(), ProtocolShapeError> {
