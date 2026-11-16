@@ -1,4 +1,4 @@
-//! Shared domain types and cryptographic protocol primitives for the AgentGuard product.
+//! Shared domain types and cryptographic protocol primitives for this product.
 //!
 //! This crate contains deterministic, side-effect-free primitives. It does not
 //! hold signing keys, perform authorization orchestration, or execute actions.
