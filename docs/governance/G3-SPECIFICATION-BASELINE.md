@@ -52,11 +52,7 @@ The current AI-assisted specification review is recorded in `security/G3-ADVERSA
 
 ## 6. Open review questions
 
-- Whether a distinct independently implemented evaluator is required for high-assurance deployments, versus isolated re-execution of the same versioned deterministic engine.
-- Whether revocation authority snapshots should be single-signer for initial OSS mode or threshold-signed for enterprise profiles.
-- Concrete evaluator artifact attestation and reproducible-build evidence format.
-- Evidence receipt signing and storage trust topology.
-- Exact trusted-clock source and rollback-resistant high-water-mark storage implementation.
+Maintainer recommendations for each open decision are recorded in `governance/G3-OPEN-DECISIONS.md`. They cover evaluator isolation, revocation signing, artifact provenance, evidence receipt topology, and trusted time/high-water-mark storage. The recommendations remain proposed until explicitly accepted by the Product Owner.
 
 These questions do not permit a weaker default. Until resolved, the specified fail-closed behavior applies.
 
