@@ -20,6 +20,7 @@
 - `governance/LICENSE-DECISION.md`: approved Apache License 2.0 decision.
 - `governance/G1-SPECIFICATION-BASELINE.md`: G1 specification set and freeze criteria.
 - `governance/G3-SPECIFICATION-BASELINE.md`: proposed G3 authorization-proof and permit-binding baseline.
+- `governance/G3-OPEN-DECISIONS.md`: maintainer recommendations for unresolved G3 product/security decisions.
 
 ## Specifications
 - `specifications/DOMAIN-MODEL.md`: identity, request, policy, approval, permit, and evidence entities.
