@@ -1,6 +1,6 @@
 # G3 Acceptance Test Plan — Authorization Proof and Permit Binding
 
-**Status:** Proposed — implementation gate  
+**Status:** Approved test contract — implementation gate remains  
 **Version:** 0.1.0  
 **Purpose:** Define falsifiable tests for the G3 attestation, envelope, and revocation contracts. This file is a test specification, not evidence that tests have run.
 
