@@ -49,10 +49,7 @@ impl SignatureEnvelope {
     /// Returns an error when the key identifier is empty/whitespace-padded or
     /// the signature string is empty.
     pub fn validate_shape(&self) -> Result<(), ProtocolShapeError> {
-        if self.key_id.is_empty()
-            || self.key_id.len() > 256
-            || self.key_id.trim() != self.key_id
-        {
+        if self.key_id.is_empty() || self.key_id.len() > 256 || self.key_id.trim() != self.key_id {
             return Err(ProtocolShapeError::InvalidKeyId);
         }
         if self.signature.is_empty() {
