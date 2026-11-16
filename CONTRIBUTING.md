@@ -1,21 +1,22 @@
 # Contributing
 
-Thank you for your interest in AIVO AgentGuard. The project is in its research and specification phase; interfaces and architecture may change before a stable release.
+Thank you for your interest in AIVO AgentGuard. The project is in its research and specification phase; interfaces may change before a stable release.
 
 ## Before contributing
 
-1. Read the README and the governance and security documents in `docs/`.
-2. Open an issue to discuss substantial changes before implementation.
-3. Do not submit secrets, private keys, seed phrases, real user data, or live transaction credentials.
-4. Do not claim production readiness or security guarantees that have not been independently validated.
+1. Read the README and documents under `docs/`.
+2. Open an issue before substantial changes.
+3. Never submit secrets, private keys, seed phrases, real user data, or live transaction credentials.
+4. Do not claim production readiness or unvalidated security guarantees.
+5. Ensure you have the right to submit your contribution under Apache-2.0.
 
 ## Engineering requirements
 
-- Keep authorization decisions deterministic and reproducible.
-- Keep LLM output advisory; it must never directly authorize execution.
+- Keep authorization deterministic and reproducible.
+- LLM output is advisory only and cannot authorize execution.
 - Fail closed on missing or invalid policy inputs.
-- Add tests for positive, negative, boundary, and adversarial cases.
-- Preserve evidence integrity and avoid mutable decision history.
+- Test positive, negative, boundary, and adversarial cases.
+- Preserve evidence integrity; corrections use linked events, not destructive mutation.
 - Document externally observable behavior and breaking changes.
 
 ## Local checks
@@ -28,8 +29,8 @@ cargo test --workspace --all-targets
 
 ## Pull requests
 
-Use a focused branch and PR. Explain motivation, design, security impact, tests, and documentation changes. Do not combine unrelated refactors with security-sensitive behavior changes.
+Use a focused branch and PR. Explain motivation, design, security impact, tests, and documentation changes. Do not combine unrelated refactors with security-sensitive changes.
 
-## License
+## License and contributions
 
-The project license is pending an explicit maintainer decision. Until the license file and contribution terms are published, do not assume that contributions are accepted under a particular open-source license.
+This project is licensed under the Apache License, Version 2.0. By intentionally submitting a contribution for inclusion, you agree that it is submitted under the terms of Apache-2.0, subject to that license. No separate CLA or DCO is currently required. You remain responsible for ensuring you have the rights needed to submit your contribution.
