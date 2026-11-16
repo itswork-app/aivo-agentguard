@@ -1,4 +1,4 @@
-//! G1 permit claims and G3 PermitEnvelopeV2 verification.
+//! G1 permit claims and G3 `PermitEnvelopeV2` verification.
 //!
 //! This module verifies signed data only. Key lookup, purpose authorization,
 //! revocation lookup, trusted clock acquisition, atomic consumption, and
