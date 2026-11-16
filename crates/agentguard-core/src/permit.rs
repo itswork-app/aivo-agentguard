@@ -9,7 +9,8 @@ use serde::{Deserialize, Serialize};
 use crate::{
     CanonicalizationError, CryptoError, Decision, ProtocolShapeError, SignatureEnvelope,
     SignedAuthorizationAttestationV1, SignedSigningChallengeV1, canonical_json, domain_digest,
-    hex_digest, protocol::{parse_timestamp, validate_hex_digest, validate_identifier, validate_lifetime},
+    hex_digest,
+    protocol::{parse_timestamp, validate_hex_digest, validate_identifier, validate_lifetime},
     verify_ed25519,
 };
 
