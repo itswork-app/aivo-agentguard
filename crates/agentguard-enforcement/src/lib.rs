@@ -227,12 +227,7 @@ where
     validate_expected_context(envelope, expected)?;
 
     let verification_keys = resolve_envelope_keys(envelope, keys)?;
-    let snapshot = verify_current_revocation(
-        keys,
-        revocation_source,
-        high_water_store,
-        &now_utc,
-    )?;
+    let snapshot = verify_current_revocation(keys, revocation_source, high_water_store, &now_utc)?;
 
     require_envelope_subjects_active(envelope, &snapshot)?;
     envelope.verify_all_signatures(
