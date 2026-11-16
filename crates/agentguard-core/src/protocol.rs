@@ -2,9 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    CanonicalizationError, canonical_json, domain_digest, hex_digest, verify_ed25519,
-};
+use crate::{CanonicalizationError, canonical_json, domain_digest, hex_digest, verify_ed25519};
 
 /// Authorization outcomes at the policy boundary.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -476,7 +474,6 @@ fn validate_lifetime(
     Ok(())
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -517,7 +514,10 @@ mod tests {
     fn rejects_impossible_calendar_timestamp() {
         let mut invalid = challenge();
         invalid.issued_at = "2026-02-30T10:00:00Z".into();
-        assert_eq!(invalid.validate(), Err(ProtocolShapeError::InvalidTimestamp));
+        assert_eq!(
+            invalid.validate(),
+            Err(ProtocolShapeError::InvalidTimestamp)
+        );
     }
 
     #[test]
@@ -549,7 +549,7 @@ mod tests {
 
     #[test]
     fn challenge_signature_verifies_exact_domain_separated_claims() {
-        use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
+        use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
         use ed25519_dalek::{Signer, SigningKey};
 
         let signing_key = SigningKey::from_bytes(&[17_u8; 32]);
@@ -566,6 +566,9 @@ mod tests {
                 signature: URL_SAFE_NO_PAD.encode(signature.to_bytes()),
             },
         };
-        assert_eq!(token.verify_signature(signing_key.verifying_key().as_bytes()), Ok(()));
+        assert_eq!(
+            token.verify_signature(signing_key.verifying_key().as_bytes()),
+            Ok(())
+        );
     }
 }
