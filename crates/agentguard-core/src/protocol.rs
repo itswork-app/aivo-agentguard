@@ -177,9 +177,7 @@ impl SigningChallengeV1 {
         if self.schema_version != 1 {
             return Err(ProtocolShapeError::UnsupportedSchemaVersion);
         }
-        for value in [
-            &self.challenge_id, &self.tenant_id, &self.signer_key_id,
-        ] {
+        for value in [&self.challenge_id, &self.tenant_id, &self.signer_key_id] {
             validate_identifier(value)?;
         }
         for value in [
@@ -253,20 +251,34 @@ impl AuthorizationAttestationV1 {
             return Err(ProtocolShapeError::DecisionNotAllowed);
         }
         for value in [
-            &self.attestation_id, &self.issuer_id, &self.issuer_key_id,
-            &self.tenant_id, &self.principal_id, &self.agent_id, &self.request_id,
-            &self.policy_id, &self.policy_version, &self.policy_issuer_id,
-            &self.policy_signing_key_id, &self.evaluator_version,
-            &self.decision_event_ref.tenant_id, &self.decision_event_ref.stream_id,
+            &self.attestation_id,
+            &self.issuer_id,
+            &self.issuer_key_id,
+            &self.tenant_id,
+            &self.principal_id,
+            &self.agent_id,
+            &self.request_id,
+            &self.policy_id,
+            &self.policy_version,
+            &self.policy_issuer_id,
+            &self.policy_signing_key_id,
+            &self.evaluator_version,
+            &self.decision_event_ref.tenant_id,
+            &self.decision_event_ref.stream_id,
             &self.evidence_receipt_ref.receipt_id,
         ] {
             validate_identifier(value)?;
         }
         for value in [
-            &self.request_digest, &self.action_digest, &self.policy_digest,
-            &self.context_digest, &self.reason_codes_digest,
-            &self.evaluator_artifact_digest, &self.decision_event_ref.event_hash,
-            &self.evidence_receipt_ref.receipt_digest, &self.challenge_nonce,
+            &self.request_digest,
+            &self.action_digest,
+            &self.policy_digest,
+            &self.context_digest,
+            &self.reason_codes_digest,
+            &self.evaluator_artifact_digest,
+            &self.decision_event_ref.event_hash,
+            &self.evidence_receipt_ref.receipt_digest,
+            &self.challenge_nonce,
             &self.challenge_digest,
         ] {
             validate_hex_digest(value)?;
@@ -316,7 +328,9 @@ impl SignedAuthorizationAttestationV1 {
     ) -> Result<(), ProtocolShapeError> {
         self.validate_shape()?;
         challenge.validate_shape()?;
-        let challenge_digest = challenge.digest().map_err(|_| ProtocolShapeError::ChallengeBindingMismatch)?;
+        let challenge_digest = challenge
+            .digest()
+            .map_err(|_| ProtocolShapeError::ChallengeBindingMismatch)?;
         let challenge_digest_hex = hex_digest(&challenge_digest);
         let c = &challenge.claims;
         let a = &self.claims;
@@ -386,16 +400,16 @@ fn parse_timestamp(value: &str) -> Result<i64, ProtocolShapeError> {
         || bytes[13] != b':'
         || bytes[16] != b':'
         || bytes[19] != b'Z'
-        || bytes.iter().enumerate().any(|(i, byte)| {
-            !matches!(i, 4 | 7 | 10 | 13 | 16 | 19) && !byte.is_ascii_digit()
-        })
+        || bytes
+            .iter()
+            .enumerate()
+            .any(|(i, byte)| !matches!(i, 4 | 7 | 10 | 13 | 16 | 19) && !byte.is_ascii_digit())
     {
         return Err(ProtocolShapeError::InvalidTimestamp);
     }
 
-    let number = |range: std::ops::Range<usize>| -> i64 {
-        value[range].parse::<i64>().unwrap_or_default()
-    };
+    let number =
+        |range: std::ops::Range<usize>| -> i64 { value[range].parse::<i64>().unwrap_or_default() };
     let year = number(0..4);
     let month = number(5..7);
     let day = number(8..10);
