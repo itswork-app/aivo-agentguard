@@ -4,6 +4,7 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
+/// Errors raised while producing RFC 8785 canonical JSON.
 #[derive(Debug, Error)]
 pub enum CanonicalizationError {
     #[error("RFC 8785 canonicalization failed: {0}")]
@@ -12,10 +13,14 @@ pub enum CanonicalizationError {
 
 /// Serialize a validated protocol value using RFC 8785 JSON Canonicalization.
 ///
-/// Security-critical structs must use serde(deny_unknown_fields) and
-/// validate AgentGuard numeric/string constraints before calling this function.
+/// Security-critical structs must deny unknown fields and validate AgentGuard
+/// numeric and string constraints before calling this function.
+///
+/// # Errors
+///
+/// Returns an error when the value cannot be serialized as canonical JSON.
 pub fn canonical_json<T: Serialize>(value: &T) -> Result<Vec<u8>, CanonicalizationError> {
-    Ok(serde_jcs::to_vec(value)?)
+    serde_jcs::to_vec(value).map_err(CanonicalizationError::from)
 }
 
 /// SHA-256(domain separator || canonical payload).
@@ -30,6 +35,7 @@ pub fn domain_digest(domain: &[u8], canonical_payload: &[u8]) -> [u8; 32] {
     hasher.finalize().into()
 }
 
+/// Encode a 32-byte digest as lowercase hexadecimal.
 #[must_use]
 pub fn hex_digest(digest: &[u8; 32]) -> String {
     const HEX: &[u8; 16] = b"0123456789abcdef";
