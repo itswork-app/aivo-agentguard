@@ -13,7 +13,7 @@ pub enum CanonicalizationError {
 
 /// Serialize a validated protocol value using RFC 8785 JSON Canonicalization.
 ///
-/// Security-critical structs must deny unknown fields and validate AgentGuard
+/// Security-critical structs must deny unknown fields and validate `AgentGuard`
 /// numeric and string constraints before calling this function.
 ///
 /// # Errors
