@@ -9,6 +9,7 @@ Define authenticated, rollback-resistant, bounded-freshness status data used by 
 - policy issuer signing keys;
 - policy identities, versions, and digests;
 - authorization-attestation issuer keys and issuer identities;
+- signing-challenge keys (permit-signing purpose; covered by the inner/outer permit signer status entries);
 - G1 inner permit signing keys;
 - PermitEnvelopeV2 outer signing keys;
 - evidence-service signing keys where evidence receipts are relied upon.
@@ -46,7 +47,7 @@ A snapshot contains:
 - `signing_key_id`
 - `signature`
 
-Each entry contains `subject_type`, `subject_id`, `status`, `effective_at`, and optional `reason_code`. Raw secrets or personal details MUST NOT appear in status entries.
+Each entry contains `subject_type`, `subject_id`, `status`, `effective_at`, and optional `reason_code`. For a current snapshot, `effective_at` MUST be no later than `this_update`; scheduled future status transitions are not supported in v1. Raw secrets or personal details MUST NOT appear in status entries.
 
 The snapshot signature is Ed25519 over canonical snapshot fields excluding signature, prefixed with `AIVO-AGENTGUARD-REVOCATION-SNAPSHOT-V1\\0`. Revocation authority keys are provisioned out-of-band and MUST be separate from all keys whose status they publish.
 
@@ -56,6 +57,7 @@ G3 default maximum snapshot age is **30 seconds**. Maximum allowed `next_update 
 
 Consumers MUST verify:
 - snapshot signature and pinned registry identity;
+- `issued_at <= this_update <= next_update`;
 - `issued_at <= now + 5 seconds`;
 - `this_update <= now + 5 seconds`;
 - `now <= next_update`;
