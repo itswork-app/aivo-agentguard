@@ -332,7 +332,7 @@ impl SignedAuthorizationAttestationV1 {
     pub fn digest(&self) -> Result<[u8; 32], CanonicalizationError> {
         let canonical = canonical_json(self)?;
         Ok(domain_digest(
-            b"AIVO-AGENTGUARD-ATTESTATION-REF-V1\\0",
+            b"AIVO-AGENTGUARD-ATTESTATION-REF-V1\0",
             &canonical,
         ))
     }
@@ -475,4 +475,98 @@ fn validate_lifetime(
         return Err(ProtocolShapeError::InvalidLifetime);
     }
     Ok(())
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn challenge() -> SigningChallengeV1 {
+        SigningChallengeV1 {
+            schema_version: 1,
+            challenge_id: "challenge-1".into(),
+            nonce: "11".repeat(32),
+            pending_signing_request_digest: "22".repeat(32),
+            tenant_id: "tenant-1".into(),
+            request_digest: "33".repeat(32),
+            action_digest: "44".repeat(32),
+            policy_digest: "55".repeat(32),
+            context_digest: "66".repeat(32),
+            issued_at: "2026-11-17T10:00:00Z".into(),
+            expires_at: "2026-11-17T10:00:30Z".into(),
+            signer_key_id: "permit-key-1".into(),
+        }
+    }
+
+    #[test]
+    fn accepts_well_formed_challenge_and_rejects_expired_order() {
+        assert_eq!(challenge().validate(), Ok(()));
+        let mut invalid = challenge();
+        invalid.expires_at = invalid.issued_at.clone();
+        assert_eq!(invalid.validate(), Err(ProtocolShapeError::InvalidLifetime));
+    }
+
+    #[test]
+    fn rejects_challenge_lifetime_over_30_seconds() {
+        let mut invalid = challenge();
+        invalid.expires_at = "2026-11-17T10:00:31Z".into();
+        assert_eq!(invalid.validate(), Err(ProtocolShapeError::InvalidLifetime));
+    }
+
+    #[test]
+    fn rejects_impossible_calendar_timestamp() {
+        let mut invalid = challenge();
+        invalid.issued_at = "2026-02-30T10:00:00Z".into();
+        assert_eq!(invalid.validate(), Err(ProtocolShapeError::InvalidTimestamp));
+    }
+
+    #[test]
+    fn rejects_non_lowercase_or_wrong_length_digest() {
+        let mut invalid = challenge();
+        invalid.nonce = "AA".repeat(32);
+        assert_eq!(invalid.validate(), Err(ProtocolShapeError::InvalidDigest));
+    }
+
+    #[test]
+    fn rejects_unknown_challenge_fields() {
+        let json = serde_json::json!({
+            "schema_version": 1,
+            "challenge_id": "challenge-1",
+            "nonce": "11".repeat(32),
+            "pending_signing_request_digest": "22".repeat(32),
+            "tenant_id": "tenant-1",
+            "request_digest": "33".repeat(32),
+            "action_digest": "44".repeat(32),
+            "policy_digest": "55".repeat(32),
+            "context_digest": "66".repeat(32),
+            "issued_at": "2026-11-17T10:00:00Z",
+            "expires_at": "2026-11-17T10:00:30Z",
+            "signer_key_id": "permit-key-1",
+            "unexpected": true
+        });
+        assert!(serde_json::from_value::<SigningChallengeV1>(json).is_err());
+    }
+
+    #[test]
+    fn challenge_signature_verifies_exact_domain_separated_claims() {
+        use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
+        use ed25519_dalek::{Signer, SigningKey};
+
+        let signing_key = SigningKey::from_bytes(&[17_u8; 32]);
+        let claims = challenge();
+        let canonical = canonical_json(&claims).unwrap();
+        let mut message = b"AIVO-AGENTGUARD-SIGNING-CHALLENGE-V1\0".to_vec();
+        message.extend_from_slice(&canonical);
+        let signature = signing_key.sign(&message);
+        let token = SignedSigningChallengeV1 {
+            claims,
+            signature: SignatureEnvelope {
+                algorithm: SignatureAlgorithm::Ed25519,
+                key_id: "permit-key-1".into(),
+                signature: URL_SAFE_NO_PAD.encode(signature.to_bytes()),
+            },
+        };
+        assert_eq!(token.verify_signature(signing_key.verifying_key().as_bytes()), Ok(()));
+    }
 }
