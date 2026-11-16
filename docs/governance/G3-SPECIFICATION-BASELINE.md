@@ -42,10 +42,15 @@ G3 is a protocol/specification gate. It does not implement runtime signing, enfo
 - `security/REVOCATION-STATUS-PROTOCOL.md`
 - `testing/G3-ACCEPTANCE-TEST-PLAN.md`
 - `testing/G3-TRACEABILITY.md`
+- `security/G3-ADVERSARIAL-REVIEW.md`
 - ADR-0008: authorization attestation and verifier isolation.
 - ADR-0009: permit envelope v2 and revocation status.
 
-## 5. Open review questions
+## 5. Adversarial review
+
+The current AI-assisted specification review is recorded in `security/G3-ADVERSARIAL-REVIEW.md`. It is a conditional pass for continued Draft review only, not Product Owner approval, third-party audit, implementation approval, or production authorization. Its limitations and unresolved questions remain binding.
+
+## 6. Open review questions
 
 - Whether a distinct independently implemented evaluator is required for high-assurance deployments, versus isolated re-execution of the same versioned deterministic engine.
 - Whether revocation authority snapshots should be single-signer for initial OSS mode or threshold-signed for enterprise profiles.
@@ -55,7 +60,7 @@ G3 is a protocol/specification gate. It does not implement runtime signing, enfo
 
 These questions do not permit a weaker default. Until resolved, the specified fail-closed behavior applies.
 
-## 6. Exit criteria
+## 7. Exit criteria
 
 - Product owner approves the G3 protocol baseline.
 - ADRs accepted and cross-document consistency verified.
