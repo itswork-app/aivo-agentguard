@@ -7,8 +7,9 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+pub use agentguard_core::Decision;
 use agentguard_core::{
-    Decision, SignatureEnvelope, canonical_json, domain_digest, hex_digest, verify_ed25519,
+    SignatureEnvelope, canonical_json, domain_digest, hex_digest, verify_ed25519,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
