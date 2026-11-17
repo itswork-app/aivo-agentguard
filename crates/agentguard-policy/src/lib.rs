@@ -546,5 +546,5 @@ mod tests {
             evaluate(&bundle(vec![policy_rule]), &wrong_resource).decision,
             Decision::Deny
         );
-       }
+    }
 }
