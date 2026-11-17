@@ -1,7 +1,10 @@
 //! Append-only evidence events, hash-chain verification, and durable receipts.
 //! Storage and signing are explicit ports; private keys never enter this crate.
 
-use agentguard_core::{CanonicalizationError, CryptoError, SignatureAlgorithm, SignatureEnvelope, canonical_json, domain_digest, hex_digest, verify_ed25519};
+use agentguard_core::{
+    CanonicalizationError, CryptoError, SignatureAlgorithm, SignatureEnvelope, canonical_json,
+    domain_digest, hex_digest, verify_ed25519,
+};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -10,19 +13,32 @@ pub const RECEIPT_SIGNATURE_DOMAIN: &[u8] = b"AIVO-AGENTGUARD-EVIDENCE-RECEIPT-V
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EvidenceEventType {
-    #[serde(rename = "REQUEST_RECEIVED")] RequestReceived,
-    #[serde(rename = "DECISION_RECORDED")] DecisionRecorded,
-    #[serde(rename = "APPROVAL_REQUESTED")] ApprovalRequested,
-    #[serde(rename = "APPROVAL_RECORDED")] ApprovalRecorded,
-    #[serde(rename = "APPROVAL_REJECTED")] ApprovalRejected,
-    #[serde(rename = "POLICY_REEVALUATED")] PolicyReevaluated,
-    #[serde(rename = "PERMIT_ISSUED")] PermitIssued,
-    #[serde(rename = "PERMIT_CONSUMED")] PermitConsumed,
-    #[serde(rename = "ENFORCEMENT_REJECTED")] EnforcementRejected,
-    #[serde(rename = "EXECUTION_OBSERVED")] ExecutionObserved,
-    #[serde(rename = "EXECUTION_FAILED")] ExecutionFailed,
-    #[serde(rename = "EXECUTION_UNKNOWN")] ExecutionUnknown,
-    #[serde(rename = "EVIDENCE_CORRECTION")] EvidenceCorrection,
+    #[serde(rename = "REQUEST_RECEIVED")]
+    RequestReceived,
+    #[serde(rename = "DECISION_RECORDED")]
+    DecisionRecorded,
+    #[serde(rename = "APPROVAL_REQUESTED")]
+    ApprovalRequested,
+    #[serde(rename = "APPROVAL_RECORDED")]
+    ApprovalRecorded,
+    #[serde(rename = "APPROVAL_REJECTED")]
+    ApprovalRejected,
+    #[serde(rename = "POLICY_REEVALUATED")]
+    PolicyReevaluated,
+    #[serde(rename = "PERMIT_ISSUED")]
+    PermitIssued,
+    #[serde(rename = "PERMIT_CONSUMED")]
+    PermitConsumed,
+    #[serde(rename = "ENFORCEMENT_REJECTED")]
+    EnforcementRejected,
+    #[serde(rename = "EXECUTION_OBSERVED")]
+    ExecutionObserved,
+    #[serde(rename = "EXECUTION_FAILED")]
+    ExecutionFailed,
+    #[serde(rename = "EXECUTION_UNKNOWN")]
+    ExecutionUnknown,
+    #[serde(rename = "EVIDENCE_CORRECTION")]
+    EvidenceCorrection,
 }
 
 impl EvidenceEventType {
@@ -127,14 +143,22 @@ struct HashPayload<'a> {
 impl EvidenceEventV1 {
     fn hash_payload(&self) -> HashPayload<'_> {
         HashPayload {
-            schema_version: self.schema_version, event_id: &self.event_id,
-            tenant_id: &self.tenant_id, stream_id: &self.stream_id,
-            sequence: self.sequence, occurred_at: &self.occurred_at,
-            event_type: self.event_type, request_id: &self.request_id,
-            actor_ref: &self.actor_ref, request_digest: &self.request_digest,
-            action_digest: &self.action_digest, policy_digest: &self.policy_digest,
-            context_digest: &self.context_digest, decision: &self.decision,
-            reason_codes: &self.reason_codes, previous_event_hash: &self.previous_event_hash,
+            schema_version: self.schema_version,
+            event_id: &self.event_id,
+            tenant_id: &self.tenant_id,
+            stream_id: &self.stream_id,
+            sequence: self.sequence,
+            occurred_at: &self.occurred_at,
+            event_type: self.event_type,
+            request_id: &self.request_id,
+            actor_ref: &self.actor_ref,
+            request_digest: &self.request_digest,
+            action_digest: &self.action_digest,
+            policy_digest: &self.policy_digest,
+            context_digest: &self.context_digest,
+            decision: &self.decision,
+            reason_codes: &self.reason_codes,
+            previous_event_hash: &self.previous_event_hash,
         }
     }
 
@@ -179,12 +203,22 @@ pub enum EvidenceStoreError {
 /// inserting the supplied next event, and durably commit it. No update/delete
 /// method is part of this interface. A successful append is a durable commit.
 pub trait EvidenceStore: Send + Sync {
-    fn read_head(&self, tenant_id: &str, stream_id: &str)
-        -> Result<Option<EvidenceStreamHead>, EvidenceStoreError>;
-    fn append_if_head_matches(&self, event: &EvidenceEventV1, expected: Option<&EvidenceStreamHead>)
-        -> Result<DurableCommitRef, EvidenceStoreError>;
-    fn read_event(&self, tenant_id: &str, stream_id: &str, sequence: u64)
-        -> Result<Option<StoredEvidenceEvent>, EvidenceStoreError>;
+    fn read_head(
+        &self,
+        tenant_id: &str,
+        stream_id: &str,
+    ) -> Result<Option<EvidenceStreamHead>, EvidenceStoreError>;
+    fn append_if_head_matches(
+        &self,
+        event: &EvidenceEventV1,
+        expected: Option<&EvidenceStreamHead>,
+    ) -> Result<DurableCommitRef, EvidenceStoreError>;
+    fn read_event(
+        &self,
+        tenant_id: &str,
+        stream_id: &str,
+        sequence: u64,
+    ) -> Result<Option<StoredEvidenceEvent>, EvidenceStoreError>;
 }
 
 /// Dedicated evidence-purpose signer; production implementations isolate its
@@ -195,9 +229,12 @@ pub trait EvidenceReceiptSigner: Send + Sync {
 
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
 pub enum EvidenceSignerError {
-    #[error("evidence signer unavailable")] Unavailable,
-    #[error("evidence signer rejected request")] Rejected,
-    #[error("evidence signer returned invalid signature envelope")] InvalidResponse,
+    #[error("evidence signer unavailable")]
+    Unavailable,
+    #[error("evidence signer rejected request")]
+    Rejected,
+    #[error("evidence signer returned invalid signature envelope")]
+    InvalidResponse,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -229,14 +266,19 @@ pub struct SignedEvidenceReceiptV1 {
 impl SignedEvidenceReceiptV1 {
     pub fn digest(&self) -> Result<[u8; 32], EvidenceError> {
         let bytes = canonical_json(self)?;
-        Ok(domain_digest(b"AIVO-AGENTGUARD-EVIDENCE-RECEIPT-DIGEST-V1\0", &bytes))
+        Ok(domain_digest(
+            b"AIVO-AGENTGUARD-EVIDENCE-RECEIPT-DIGEST-V1\0",
+            &bytes,
+        ))
     }
 
     /// Caller resolves this key from the evidence-receipt purpose registry and
     /// checks its current revocation status before verification.
-    pub fn verify_signature(&self, public_key: &[u8; 32], expected_key_id: &str)
-        -> Result<(), EvidenceError>
-    {
+    pub fn verify_signature(
+        &self,
+        public_key: &[u8; 32],
+        expected_key_id: &str,
+    ) -> Result<(), EvidenceError> {
         validate_receipt(&self.claims)?;
         if self.signature.key_id != expected_key_id
             || self.claims.evidence_key_id != expected_key_id
@@ -260,24 +302,39 @@ pub struct EvidenceAppendResult {
 
 #[derive(Debug, Error)]
 pub enum EvidenceError {
-    #[error("canonicalization failed: {0}")] Canonicalization(#[from] CanonicalizationError),
-    #[error("storage failed: {0}")] Store(#[from] EvidenceStoreError),
-    #[error("signer failed: {0}")] Signer(#[from] EvidenceSignerError),
-    #[error("signature verification failed: {0}")] Crypto(#[from] CryptoError),
-    #[error("invalid evidence event")] InvalidEvent,
-    #[error("invalid evidence receipt")] InvalidReceipt,
-    #[error("event hash mismatch")] EventHashMismatch,
-    #[error("committed event read-back mismatch")] ReadBackMismatch,
-    #[error("receipt does not bind committed event")] ReceiptBindingMismatch,
-    #[error("receipt signer key mismatch")] ReceiptKeyMismatch,
-    #[error("stream contention exceeded retry budget")] Contention,
+    #[error("canonicalization failed: {0}")]
+    Canonicalization(#[from] CanonicalizationError),
+    #[error("storage failed: {0}")]
+    Store(#[from] EvidenceStoreError),
+    #[error("signer failed: {0}")]
+    Signer(#[from] EvidenceSignerError),
+    #[error("signature verification failed: {0}")]
+    Crypto(#[from] CryptoError),
+    #[error("invalid evidence event")]
+    InvalidEvent,
+    #[error("invalid evidence receipt")]
+    InvalidReceipt,
+    #[error("event hash mismatch")]
+    EventHashMismatch,
+    #[error("committed event read-back mismatch")]
+    ReadBackMismatch,
+    #[error("receipt does not bind committed event")]
+    ReceiptBindingMismatch,
+    #[error("receipt signer key mismatch")]
+    ReceiptKeyMismatch,
+    #[error("stream contention exceeded retry budget")]
+    Contention,
 }
 
 /// Append with bounded optimistic retries. Receipt signing happens only after
 /// durable commit and exact read-back verification have succeeded.
 pub fn append_with_durable_receipt<S: EvidenceStore, K: EvidenceReceiptSigner>(
-    store: &S, signer: &K, draft: &EvidenceEventDraftV1, receipt_id: &str,
-    committed_at: &str, evidence_key_id: &str,
+    store: &S,
+    signer: &K,
+    draft: &EvidenceEventDraftV1,
+    receipt_id: &str,
+    committed_at: &str,
+    evidence_key_id: &str,
 ) -> Result<EvidenceAppendResult, EvidenceError> {
     validate_draft(draft)?;
     identifier(receipt_id)?;
@@ -287,7 +344,13 @@ pub fn append_with_durable_receipt<S: EvidenceStore, K: EvidenceReceiptSigner>(
     for _ in 0..8 {
         let head = store.read_head(&draft.tenant_id, &draft.stream_id)?;
         let (sequence, previous_event_hash) = match &head {
-            Some(value) => (value.sequence.checked_add(1).ok_or(EvidenceError::InvalidEvent)?, value.event_hash.clone()),
+            Some(value) => (
+                value
+                    .sequence
+                    .checked_add(1)
+                    .ok_or(EvidenceError::InvalidEvent)?,
+                value.event_hash.clone(),
+            ),
             None => (1, "0".repeat(64)),
         };
         let mut event = from_draft(draft, sequence, previous_event_hash);
@@ -300,14 +363,16 @@ pub fn append_with_durable_receipt<S: EvidenceStore, K: EvidenceReceiptSigner>(
         };
         identifier(&commit.commit_id)?;
 
-        let stored = store.read_event(&event.tenant_id, &event.stream_id, event.sequence)?
+        let stored = store
+            .read_event(&event.tenant_id, &event.stream_id, event.sequence)?
             .ok_or(EvidenceError::ReadBackMismatch)?;
         stored.event.verify_integrity()?;
         if stored.event != event || stored.commit != commit {
             return Err(EvidenceError::ReadBackMismatch);
         }
 
-        let claims = make_receipt_claims(&event, &commit, receipt_id, committed_at, evidence_key_id)?;
+        let claims =
+            make_receipt_claims(&event, &commit, receipt_id, committed_at, evidence_key_id)?;
         let bytes = canonical_json(&claims)?;
         let signature = signer.sign_receipt(&domain_message(RECEIPT_SIGNATURE_DOMAIN, &bytes))?;
         if signature.algorithm != SignatureAlgorithm::Ed25519
@@ -318,7 +383,11 @@ pub fn append_with_durable_receipt<S: EvidenceStore, K: EvidenceReceiptSigner>(
         }
         let receipt = SignedEvidenceReceiptV1 { claims, signature };
         let receipt_digest = hex_digest(&receipt.digest()?);
-        return Ok(EvidenceAppendResult { event, receipt, receipt_digest });
+        return Ok(EvidenceAppendResult {
+            event,
+            receipt,
+            receipt_digest,
+        });
     }
     Err(EvidenceError::Contention)
 }
@@ -326,12 +395,15 @@ pub fn append_with_durable_receipt<S: EvidenceStore, K: EvidenceReceiptSigner>(
 /// Verify receipt signature and retrieve the exact referenced event from the
 /// evidence store. Caller must independently check key purpose and revocation.
 pub fn verify_receipt_read_back<S: EvidenceStore>(
-    store: &S, receipt: &SignedEvidenceReceiptV1, public_key: &[u8; 32],
+    store: &S,
+    receipt: &SignedEvidenceReceiptV1,
+    public_key: &[u8; 32],
     expected_key_id: &str,
 ) -> Result<EvidenceEventV1, EvidenceError> {
     receipt.verify_signature(public_key, expected_key_id)?;
     let claims = &receipt.claims;
-    let stored = store.read_event(&claims.tenant_id, &claims.stream_id, claims.sequence)?
+    let stored = store
+        .read_event(&claims.tenant_id, &claims.stream_id, claims.sequence)?
         .ok_or(EvidenceError::ReadBackMismatch)?;
     if stored.commit.commit_id != claims.storage_commit_id {
         return Err(EvidenceError::ReceiptBindingMismatch);
@@ -350,28 +422,54 @@ pub fn verify_receipt_read_back<S: EvidenceStore>(
     Ok(event)
 }
 
-fn from_draft(d: &EvidenceEventDraftV1, sequence: u64, previous_event_hash: String) -> EvidenceEventV1 {
+fn from_draft(
+    d: &EvidenceEventDraftV1,
+    sequence: u64,
+    previous_event_hash: String,
+) -> EvidenceEventV1 {
     EvidenceEventV1 {
-        schema_version: d.schema_version, event_id: d.event_id.clone(), tenant_id: d.tenant_id.clone(),
-        stream_id: d.stream_id.clone(), sequence, occurred_at: d.occurred_at.clone(),
-        event_type: d.event_type, request_id: d.request_id.clone(), actor_ref: d.actor_ref.clone(),
-        request_digest: d.request_digest.clone(), action_digest: d.action_digest.clone(),
-        policy_digest: d.policy_digest.clone(), context_digest: d.context_digest.clone(),
-        decision: d.decision.clone(), reason_codes: d.reason_codes.clone(),
-        previous_event_hash, event_hash: String::new(),
+        schema_version: d.schema_version,
+        event_id: d.event_id.clone(),
+        tenant_id: d.tenant_id.clone(),
+        stream_id: d.stream_id.clone(),
+        sequence,
+        occurred_at: d.occurred_at.clone(),
+        event_type: d.event_type,
+        request_id: d.request_id.clone(),
+        actor_ref: d.actor_ref.clone(),
+        request_digest: d.request_digest.clone(),
+        action_digest: d.action_digest.clone(),
+        policy_digest: d.policy_digest.clone(),
+        context_digest: d.context_digest.clone(),
+        decision: d.decision.clone(),
+        reason_codes: d.reason_codes.clone(),
+        previous_event_hash,
+        event_hash: String::new(),
     }
 }
 
 fn make_receipt_claims(
-    e: &EvidenceEventV1, c: &DurableCommitRef, receipt_id: &str, committed_at: &str, key_id: &str,
+    e: &EvidenceEventV1,
+    c: &DurableCommitRef,
+    receipt_id: &str,
+    committed_at: &str,
+    key_id: &str,
 ) -> Result<EvidenceReceiptClaimsV1, EvidenceError> {
     Ok(EvidenceReceiptClaimsV1 {
-        schema_version: 1, receipt_id: receipt_id.into(), tenant_id: e.tenant_id.clone(),
-        stream_id: e.stream_id.clone(), sequence: e.sequence, event_hash: e.event_hash.clone(),
+        schema_version: 1,
+        receipt_id: receipt_id.into(),
+        tenant_id: e.tenant_id.clone(),
+        stream_id: e.stream_id.clone(),
+        sequence: e.sequence,
+        event_hash: e.event_hash.clone(),
         event_type: e.event_type.as_str().into(),
-        request_digest: required_digest(&e.request_digest)?, action_digest: required_digest(&e.action_digest)?,
-        policy_digest: required_digest(&e.policy_digest)?, context_digest: required_digest(&e.context_digest)?,
-        storage_commit_id: c.commit_id.clone(), committed_at: committed_at.into(), evidence_key_id: key_id.into(),
+        request_digest: required_digest(&e.request_digest)?,
+        action_digest: required_digest(&e.action_digest)?,
+        policy_digest: required_digest(&e.policy_digest)?,
+        context_digest: required_digest(&e.context_digest)?,
+        storage_commit_id: c.commit_id.clone(),
+        committed_at: committed_at.into(),
+        evidence_key_id: key_id.into(),
     })
 }
 
@@ -381,51 +479,123 @@ fn required_digest(value: &Option<String>) -> Result<String, EvidenceError> {
     Ok(v.clone())
 }
 fn validate_draft(d: &EvidenceEventDraftV1) -> Result<(), EvidenceError> {
-    if d.schema_version != 1 || d.reason_codes.len() > 64
+    if d.schema_version != 1
+        || d.reason_codes.len() > 64
         || d.reason_codes.iter().any(|v| v.is_empty() || v.len() > 128)
-        || d.decision.as_ref().is_some_and(|v| v.is_empty() || v.len() > 32)
-    { return Err(EvidenceError::InvalidEvent); }
-    for v in [&d.event_id, &d.tenant_id, &d.stream_id, &d.request_id, &d.actor_ref] { identifier(v)?; }
+        || d.decision
+            .as_ref()
+            .is_some_and(|v| v.is_empty() || v.len() > 32)
+    {
+        return Err(EvidenceError::InvalidEvent);
+    }
+    for v in [
+        &d.event_id,
+        &d.tenant_id,
+        &d.stream_id,
+        &d.request_id,
+        &d.actor_ref,
+    ] {
+        identifier(v)?;
+    }
     timestamp(&d.occurred_at)?;
-    for v in [&d.request_digest, &d.action_digest, &d.policy_digest, &d.context_digest].into_iter().flatten() { digest(v)?; }
+    for v in [
+        &d.request_digest,
+        &d.action_digest,
+        &d.policy_digest,
+        &d.context_digest,
+    ]
+    .into_iter()
+    .flatten()
+    {
+        digest(v)?;
+    }
     Ok(())
 }
 fn validate_event(e: &EvidenceEventV1) -> Result<(), EvidenceError> {
-    if e.sequence == 0 { return Err(EvidenceError::InvalidEvent); }
+    if e.sequence == 0 {
+        return Err(EvidenceError::InvalidEvent);
+    }
     digest(&e.previous_event_hash)?;
     validate_draft(&EvidenceEventDraftV1 {
-        schema_version:e.schema_version, event_id:e.event_id.clone(), tenant_id:e.tenant_id.clone(),
-        stream_id:e.stream_id.clone(), occurred_at:e.occurred_at.clone(), event_type:e.event_type,
-        request_id:e.request_id.clone(), actor_ref:e.actor_ref.clone(), request_digest:e.request_digest.clone(),
-        action_digest:e.action_digest.clone(), policy_digest:e.policy_digest.clone(),
-        context_digest:e.context_digest.clone(), decision:e.decision.clone(), reason_codes:e.reason_codes.clone(),
+        schema_version: e.schema_version,
+        event_id: e.event_id.clone(),
+        tenant_id: e.tenant_id.clone(),
+        stream_id: e.stream_id.clone(),
+        occurred_at: e.occurred_at.clone(),
+        event_type: e.event_type,
+        request_id: e.request_id.clone(),
+        actor_ref: e.actor_ref.clone(),
+        request_digest: e.request_digest.clone(),
+        action_digest: e.action_digest.clone(),
+        policy_digest: e.policy_digest.clone(),
+        context_digest: e.context_digest.clone(),
+        decision: e.decision.clone(),
+        reason_codes: e.reason_codes.clone(),
     })
 }
 fn validate_receipt(c: &EvidenceReceiptClaimsV1) -> Result<(), EvidenceError> {
-    if c.schema_version != 1 || c.sequence == 0 { return Err(EvidenceError::InvalidReceipt); }
-    for v in [&c.receipt_id, &c.tenant_id, &c.stream_id, &c.event_type, &c.storage_commit_id, &c.evidence_key_id] { identifier(v).map_err(|_| EvidenceError::InvalidReceipt)?; }
-    for v in [&c.event_hash, &c.request_digest, &c.action_digest, &c.policy_digest, &c.context_digest] { digest(v).map_err(|_| EvidenceError::InvalidReceipt)?; }
+    if c.schema_version != 1 || c.sequence == 0 {
+        return Err(EvidenceError::InvalidReceipt);
+    }
+    for v in [
+        &c.receipt_id,
+        &c.tenant_id,
+        &c.stream_id,
+        &c.event_type,
+        &c.storage_commit_id,
+        &c.evidence_key_id,
+    ] {
+        identifier(v).map_err(|_| EvidenceError::InvalidReceipt)?;
+    }
+    for v in [
+        &c.event_hash,
+        &c.request_digest,
+        &c.action_digest,
+        &c.policy_digest,
+        &c.context_digest,
+    ] {
+        digest(v).map_err(|_| EvidenceError::InvalidReceipt)?;
+    }
     timestamp(&c.committed_at).map_err(|_| EvidenceError::InvalidReceipt)
 }
 fn identifier(v: &str) -> Result<(), EvidenceError> {
-    if v.is_empty() || v.len() > 256 || v.trim() != v || v.chars().any(char::is_control) { return Err(EvidenceError::InvalidEvent); }
+    if v.is_empty() || v.len() > 256 || v.trim() != v || v.chars().any(char::is_control) {
+        return Err(EvidenceError::InvalidEvent);
+    }
     Ok(())
 }
 fn digest(v: &str) -> Result<(), EvidenceError> {
-    if v.len() != 64 || !v.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)) { return Err(EvidenceError::InvalidEvent); }
+    if v.len() != 64
+        || !v
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+    {
+        return Err(EvidenceError::InvalidEvent);
+    }
     Ok(())
 }
 fn timestamp(v: &str) -> Result<(), EvidenceError> {
     let b = v.as_bytes();
-    if b.len() != 20 || b[4] != b'-' || b[7] != b'-' || b[10] != b'T'
-        || b[13] != b':' || b[16] != b':' || b[19] != b'Z'
-        || b.iter().enumerate().any(|(i, x)| ![4,7,10,13,16,19].contains(&i) && !x.is_ascii_digit())
-    { return Err(EvidenceError::InvalidEvent); }
+    if b.len() != 20
+        || b[4] != b'-'
+        || b[7] != b'-'
+        || b[10] != b'T'
+        || b[13] != b':'
+        || b[16] != b':'
+        || b[19] != b'Z'
+        || b.iter()
+            .enumerate()
+            .any(|(i, x)| ![4, 7, 10, 13, 16, 19].contains(&i) && !x.is_ascii_digit())
+    {
+        return Err(EvidenceError::InvalidEvent);
+    }
     Ok(())
 }
 fn domain_message(domain: &[u8], payload: &[u8]) -> Vec<u8> {
     let mut v = Vec::with_capacity(domain.len() + payload.len());
-    v.extend_from_slice(domain); v.extend_from_slice(payload); v
+    v.extend_from_slice(domain);
+    v.extend_from_slice(payload);
+    v
 }
 
 #[cfg(test)]
@@ -433,13 +603,20 @@ mod tests {
     use super::*;
     fn draft() -> EvidenceEventDraftV1 {
         EvidenceEventDraftV1 {
-            schema_version:1, event_id:"event-1".into(), tenant_id:"tenant-1".into(),
-            stream_id:"stream-1".into(), occurred_at:"2026-11-17T01:00:00Z".into(),
-            event_type:EvidenceEventType::DecisionRecorded, request_id:"request-1".into(),
-            actor_ref:"agent:agent-1".into(), request_digest:Some("a".repeat(64)),
-            action_digest:Some("b".repeat(64)), policy_digest:Some("c".repeat(64)),
-            context_digest:Some("d".repeat(64)), decision:Some("ALLOW".into()),
-            reason_codes:vec!["POLICY_MATCH".into()],
+            schema_version: 1,
+            event_id: "event-1".into(),
+            tenant_id: "tenant-1".into(),
+            stream_id: "stream-1".into(),
+            occurred_at: "2026-11-17T01:00:00Z".into(),
+            event_type: EvidenceEventType::DecisionRecorded,
+            request_id: "request-1".into(),
+            actor_ref: "agent:agent-1".into(),
+            request_digest: Some("a".repeat(64)),
+            action_digest: Some("b".repeat(64)),
+            policy_digest: Some("c".repeat(64)),
+            context_digest: Some("d".repeat(64)),
+            decision: Some("ALLOW".into()),
+            reason_codes: vec!["POLICY_MATCH".into()],
         }
     }
     #[test]
@@ -466,7 +643,13 @@ mod tests {
     }
     #[test]
     fn event_names_are_stable() {
-        assert_eq!(EvidenceEventType::DecisionRecorded.as_str(), "DECISION_RECORDED");
-        assert_eq!(EvidenceEventType::ExecutionUnknown.as_str(), "EXECUTION_UNKNOWN");
+        assert_eq!(
+            EvidenceEventType::DecisionRecorded.as_str(),
+            "DECISION_RECORDED"
+        );
+        assert_eq!(
+            EvidenceEventType::ExecutionUnknown.as_str(),
+            "EXECUTION_UNKNOWN"
+        );
     }
 }
