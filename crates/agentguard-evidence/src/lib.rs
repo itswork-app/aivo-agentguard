@@ -695,6 +695,29 @@ mod tests {
         assert!(timestamp("2026-11-17T01:00:00.1Z").is_err());
     }
     #[test]
+    fn decision_receipt_requires_all_exact_binding_digests() {
+        let mut value = draft();
+        assert!(validate_receipt_eligible_draft(&value).is_ok());
+        value.context_digest = None;
+        assert!(validate_receipt_eligible_draft(&value).is_err());
+        value.context_digest = Some("d".repeat(64));
+        value.event_type = EvidenceEventType::PermitIssued;
+        assert!(validate_receipt_eligible_draft(&value).is_err());
+    }
+
+    #[test]
+    fn optional_event_fields_are_omitted_not_serialized_as_null() {
+        let mut value = draft();
+        value.context_digest = None;
+        value.request_digest = None;
+        let event = from_draft(&value, 1, "0".repeat(64));
+        let canonical = canonical_json(&event.hash_payload()).unwrap();
+        let text = String::from_utf8(canonical).unwrap();
+        assert!(!text.contains("context_digest"));
+        assert!(!text.contains("request_digest"));
+    }
+
+    #[test]
     fn event_names_are_stable() {
         assert_eq!(
             EvidenceEventType::DecisionRecorded.as_str(),
