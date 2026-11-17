@@ -1,4 +1,4 @@
-//! Pure, deterministic policy combining for the AgentGuard v1 policy contract.
+//! Pure, deterministic policy combining for the `AgentGuard` v1 policy contract.
 //!
 //! This module deliberately performs no authentication, clock reads, I/O,
 //! canonicalization, signing, or evidence persistence. Callers must validate
@@ -35,7 +35,7 @@ pub struct PolicyRule {
     pub resources: Vec<String>,
     /// All predicates must match. An empty list evaluates true.
     pub conditions: Vec<Condition>,
-    /// Required only for REQUIRE_APPROVAL.
+    /// Required only for `REQUIRE_APPROVAL`.
     pub approval_profile_id: Option<String>,
 }
 
@@ -66,7 +66,7 @@ pub struct Condition {
     pub field: String,
     pub operator: Operator,
     /// EXISTS uses Some(Bool) to state the expected presence.
-    /// IN/NOT_IN use Set; all other operators use a scalar.
+    /// `IN/NOT_IN` use `Set`; all other operators use a scalar.
     pub expected: Value,
 }
 
@@ -131,6 +131,7 @@ impl DecisionResult {
 /// Validation failures return a DENY result with a stable reason code. This
 /// function is deterministic for identical inputs and does not consult ambient
 /// state. It is not a substitute for the upstream trust/provenance checks.
+#[must_use]
 pub fn evaluate(bundle: &PolicyBundle, request: &PolicyRequest<'_>) -> DecisionResult {
     if bundle.schema_version != POLICY_SCHEMA_V1 {
         return DecisionResult::deny(ReasonCode::PolicySchemaUnsupported);
@@ -297,7 +298,7 @@ mod tests {
         }
     }
 
-    fn request<'a>(context: &'a BTreeMap<String, Value>) -> PolicyRequest<'a> {
+    fn request(context: &BTreeMap<String, Value>) -> PolicyRequest<'_> {
         PolicyRequest {
             principal_id: "user-1",
             agent_id: "agent-1",
