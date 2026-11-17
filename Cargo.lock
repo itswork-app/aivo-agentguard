@@ -20,6 +20,7 @@ name = "agentguard-enforcement"
 version = "0.1.0"
 dependencies = [
  "agentguard-core",
+ "agentguard-evidence",
  "serde",
  "thiserror",
 ]
