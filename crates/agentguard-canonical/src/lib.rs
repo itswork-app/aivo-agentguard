@@ -123,7 +123,10 @@ impl<'de> Visitor<'de> for StrictValueVisitor {
         Ok(StrictValue::Null)
     }
 
-    fn visit_bool<E>(self, value: bool) -> Result<Self::Value, E> {
+    fn visit_bool<E>(self, value: bool) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
         Ok(StrictValue::Bool(value))
     }
 
