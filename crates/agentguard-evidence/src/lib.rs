@@ -209,16 +209,28 @@ pub enum EvidenceStoreError {
 /// inserting the supplied next event, and durably commit it. No update/delete
 /// method is part of this interface. A successful append is a durable commit.
 pub trait EvidenceStore: Send + Sync {
+    /// Read the current committed stream head.
+    ///
+    /// # Errors
+    /// Returns an error if the evidence store is unavailable or the stream cannot be read.
     fn read_head(
         &self,
         tenant_id: &str,
         stream_id: &str,
     ) -> Result<Option<EvidenceStreamHead>, EvidenceStoreError>;
+    /// Atomically append the event if the expected stream head still matches.
+    ///
+    /// # Errors
+    /// Returns a conflict when another writer advanced the stream, or a storage error.
     fn append_if_head_matches(
         &self,
         event: &EvidenceEventV1,
         expected: Option<&EvidenceStreamHead>,
     ) -> Result<DurableCommitRef, EvidenceStoreError>;
+    /// Read an event and its durable commit identity by exact stream sequence.
+    ///
+    /// # Errors
+    /// Returns an error if the evidence store is unavailable or the read fails.
     fn read_event(
         &self,
         tenant_id: &str,
@@ -230,6 +242,10 @@ pub trait EvidenceStore: Send + Sync {
 /// Dedicated evidence-purpose signer; production implementations isolate its
 /// private key and authorize only receipt-signing requests.
 pub trait EvidenceReceiptSigner: Send + Sync {
+    /// Sign the supplied domain-separated receipt message.
+    ///
+    /// # Errors
+    /// Returns an error if the signer is unavailable or rejects the request.
     fn sign_receipt(&self, message: &[u8]) -> Result<SignatureEnvelope, EvidenceSignerError>;
 }
 
@@ -270,6 +286,10 @@ pub struct SignedEvidenceReceiptV1 {
 }
 
 impl SignedEvidenceReceiptV1 {
+    /// Compute a domain-separated digest of the complete signed receipt.
+    ///
+    /// # Errors
+    /// Returns an error if canonical receipt serialization fails.
     pub fn digest(&self) -> Result<[u8; 32], EvidenceError> {
         let bytes = canonical_json(self)?;
         Ok(domain_digest(
@@ -280,6 +300,9 @@ impl SignedEvidenceReceiptV1 {
 
     /// Caller resolves this key from the evidence-receipt purpose registry and
     /// checks its current revocation status before verification.
+    ///
+    /// # Errors
+    /// Returns an error if claims, key identity, signature encoding, or signature are invalid.
     pub fn verify_signature(
         &self,
         public_key: &[u8; 32],
@@ -334,6 +357,9 @@ pub enum EvidenceError {
 
 /// Append with bounded optimistic retries. Receipt signing happens only after
 /// durable commit and exact read-back verification have succeeded.
+///
+/// # Errors
+/// Returns an error for invalid input, storage failure, failed read-back, or signer failure.
 pub fn append_with_durable_receipt<S: EvidenceStore, K: EvidenceReceiptSigner>(
     store: &S,
     signer: &K,
@@ -400,6 +426,9 @@ pub fn append_with_durable_receipt<S: EvidenceStore, K: EvidenceReceiptSigner>(
 
 /// Verify receipt signature and retrieve the exact referenced event from the
 /// evidence store. Caller must independently check key purpose and revocation.
+///
+/// # Errors
+/// Returns an error if the receipt signature, durable commit reference, or event binding is invalid.
 pub fn verify_receipt_read_back<S: EvidenceStore>(
     store: &S,
     receipt: &SignedEvidenceReceiptV1,
@@ -469,18 +498,18 @@ fn make_receipt_claims(
         sequence: e.sequence,
         event_hash: e.event_hash.clone(),
         event_type: e.event_type.as_str().into(),
-        request_digest: required_digest(&e.request_digest)?,
-        action_digest: required_digest(&e.action_digest)?,
-        policy_digest: required_digest(&e.policy_digest)?,
-        context_digest: required_digest(&e.context_digest)?,
+        request_digest: required_digest(e.request_digest.as_ref())?,
+        action_digest: required_digest(e.action_digest.as_ref())?,
+        policy_digest: required_digest(e.policy_digest.as_ref())?,
+        context_digest: required_digest(e.context_digest.as_ref())?,
         storage_commit_id: c.commit_id.clone(),
         committed_at: committed_at.into(),
         evidence_key_id: key_id.into(),
     })
 }
 
-fn required_digest(value: &Option<String>) -> Result<String, EvidenceError> {
-    let v = value.as_ref().ok_or(EvidenceError::InvalidReceipt)?;
+fn required_digest(value: Option<&String>) -> Result<String, EvidenceError> {
+    let v = value.ok_or(EvidenceError::InvalidReceipt)?;
     digest(v)?;
     Ok(v.clone())
 }
