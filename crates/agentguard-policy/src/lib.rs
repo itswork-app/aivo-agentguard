@@ -410,7 +410,6 @@ mod tests {
         value
     }
 
-
     #[test]
     fn invalid_rule_configurations_fail_closed() {
         let context = BTreeMap::new();
@@ -422,15 +421,10 @@ mod tests {
             Decision::Deny
         );
 
-        let mut missing_approval_profile =
-            rule("missing-profile", RuleEffect::RequireApproval);
+        let mut missing_approval_profile = rule("missing-profile", RuleEffect::RequireApproval);
         missing_approval_profile.approval_profile_id = None;
         assert_eq!(
-            evaluate(
-                &bundle(vec![missing_approval_profile]),
-                &request(&context)
-            )
-            .decision,
+            evaluate(&bundle(vec![missing_approval_profile]), &request(&context)).decision,
             Decision::Deny
         );
 
@@ -552,6 +546,4 @@ mod tests {
             evaluate(&bundle(vec![policy_rule]), &wrong_resource).decision,
             Decision::Deny
         );
-    }
-
-}
+    }}
