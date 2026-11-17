@@ -1,4 +1,4 @@
-//! Strict AgentGuard canonical JSON and domain-separated SHA-256 primitives.
+//! Strict `AgentGuard` canonical JSON and domain-separated SHA-256 primitives.
 //!
 //! The accepted JSON profile is intentionally narrower than general RFC 8785:
 //! floating-point values are forbidden and integers must be IEEE-754 safe
@@ -12,7 +12,7 @@ use std::fmt;
 /// Maximum accepted raw JSON input size (1 MiB).
 pub const MAX_CANONICAL_INPUT_BYTES: usize = 1_048_576;
 
-/// Maximum absolute integer value accepted by the AgentGuard v1 profile.
+/// Maximum absolute integer value accepted by the `AgentGuard` v1 profile.
 pub const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
 
 /// Stable, non-sensitive canonicalization failure categories.
@@ -51,7 +51,7 @@ impl fmt::Display for CanonicalError {
 
 impl std::error::Error for CanonicalError {}
 
-/// Closed set of AgentGuard v1 digest domains.
+/// Closed set of `AgentGuard` v1 digest domains.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DigestDomain {
     /// Request identity and request content.
@@ -199,10 +199,15 @@ impl<'de> Visitor<'de> for StrictValueVisitor {
     }
 }
 
-/// Parses and canonicalizes raw JSON under the AgentGuard v1 numeric profile.
+/// Parses and canonicalizes raw JSON under the `AgentGuard` v1 numeric profile.
 ///
 /// Raw bytes are required so duplicate keys can be detected before a generic
 /// map representation can discard them.
+///
+/// # Errors
+///
+/// Returns a stable `CanonicalError` for oversized input, malformed JSON,
+/// duplicate keys, unsupported numeric values, or serialization failures.
 pub fn canonicalize_json(input: &[u8]) -> Result<Vec<u8>, CanonicalError> {
     if input.len() > MAX_CANONICAL_INPUT_BYTES {
         return Err(CanonicalError::InputTooLarge);
@@ -229,6 +234,10 @@ pub fn canonicalize_json(input: &[u8]) -> Result<Vec<u8>, CanonicalError> {
 }
 
 /// Computes a raw 32-byte SHA-256 digest over domain separator + canonical JSON.
+///
+/// # Errors
+///
+/// Returns any canonicalization error produced while validating the input.
 pub fn digest_json(domain: DigestDomain, input: &[u8]) -> Result<[u8; 32], CanonicalError> {
     let canonical = canonicalize_json(input)?;
     let mut hasher = Sha256::new();
@@ -238,6 +247,10 @@ pub fn digest_json(domain: DigestDomain, input: &[u8]) -> Result<[u8; 32], Canon
 }
 
 /// Computes a lowercase 64-character hexadecimal domain-separated digest.
+///
+/// # Errors
+///
+/// Returns any canonicalization error produced while validating the input.
 pub fn digest_hex(domain: DigestDomain, input: &[u8]) -> Result<String, CanonicalError> {
     let digest = digest_json(domain, input)?;
     let mut output = String::with_capacity(64);
@@ -248,6 +261,7 @@ pub fn digest_hex(domain: DigestDomain, input: &[u8]) -> Result<String, Canonica
     Ok(output)
 }
 
+#[cfg(test)]
 fn hex_encode(bytes: &[u8]) -> String {
     let mut output = String::with_capacity(bytes.len() * 2);
     for byte in bytes {
