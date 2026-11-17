@@ -1,6 +1,6 @@
 # G3.2 Runtime Decision and Evidence Coordinator
 
-Status: implementation slice in progress. This document describes the current library boundary; it is not a production-readiness claim.
+Status: implementation slice in progress. The fail-closed storage-error test is implemented; CI validation is pending. This document describes the current library boundary; it is not a production-readiness claim.
 
 ## Scope
 
@@ -37,6 +37,7 @@ The evidence signer MUST be isolated, purpose-scoped, and expose a fixed configu
 - Evidence storage, read-back, clock, and signer failures abort the operation.
 - A decision is not returned until its evidence event is durably committed and verified.
 - Event reason codes are stable protocol strings, not Rust debug formatting.
+- Automated test asserts that a stream-head storage failure returns an error, exposes no policy decision, and does not invoke the evidence signer.
 - Tenant ID for the event is taken from the evaluated request, never from a caller-supplied evidence field.
 - ALLOW is a policy outcome, not an execution capability or authorization permit.
 - Enforcement remains a separate boundary and must verify signed attestation, evidence receipt, revocation status, independently derived execution context, expiry, and atomic single-use permit consumption.
