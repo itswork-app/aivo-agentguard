@@ -110,10 +110,15 @@ struct HashPayload<'a> {
     event_type: EvidenceEventType,
     request_id: &'a str,
     actor_ref: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
     request_digest: &'a Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     action_digest: &'a Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     policy_digest: &'a Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     context_digest: &'a Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     decision: &'a Option<String>,
     reason_codes: &'a [String],
     previous_event_hash: &'a str,
@@ -179,7 +184,7 @@ pub trait EvidenceStore: Send + Sync {
     fn append_if_head_matches(&self, event: &EvidenceEventV1, expected: Option<&EvidenceStreamHead>)
         -> Result<DurableCommitRef, EvidenceStoreError>;
     fn read_event(&self, tenant_id: &str, stream_id: &str, sequence: u64)
-        -> Result<Option<EvidenceEventV1>, EvidenceStoreError>;
+        -> Result<Option<StoredEvidenceEvent>, EvidenceStoreError>;
 }
 
 /// Dedicated evidence-purpose signer; production implementations isolate its
@@ -297,8 +302,10 @@ pub fn append_with_durable_receipt<S: EvidenceStore, K: EvidenceReceiptSigner>(
 
         let stored = store.read_event(&event.tenant_id, &event.stream_id, event.sequence)?
             .ok_or(EvidenceError::ReadBackMismatch)?;
-        stored.verify_integrity()?;
-        if stored != event { return Err(EvidenceError::ReadBackMismatch); }
+        stored.event.verify_integrity()?;
+        if stored.event != event || stored.commit != commit {
+            return Err(EvidenceError::ReadBackMismatch);
+        }
 
         let claims = make_receipt_claims(&event, &commit, receipt_id, committed_at, evidence_key_id)?;
         let bytes = canonical_json(&claims)?;
@@ -324,15 +331,19 @@ pub fn verify_receipt_read_back<S: EvidenceStore>(
 ) -> Result<EvidenceEventV1, EvidenceError> {
     receipt.verify_signature(public_key, expected_key_id)?;
     let claims = &receipt.claims;
-    let event = store.read_event(&claims.tenant_id, &claims.stream_id, claims.sequence)?
+    let stored = store.read_event(&claims.tenant_id, &claims.stream_id, claims.sequence)?
         .ok_or(EvidenceError::ReadBackMismatch)?;
+    if stored.commit.commit_id != claims.storage_commit_id {
+        return Err(EvidenceError::ReceiptBindingMismatch);
+    }
+    let event = stored.event;
     event.verify_integrity()?;
     if event.event_hash != claims.event_hash
         || event.event_type.as_str() != claims.event_type
-        || event.request_digest.as_deref() != Some(&claims.request_digest)
-        || event.action_digest.as_deref() != Some(&claims.action_digest)
-        || event.policy_digest.as_deref() != Some(&claims.policy_digest)
-        || event.context_digest.as_deref() != Some(&claims.context_digest)
+        || event.request_digest.as_deref() != Some(claims.request_digest.as_str())
+        || event.action_digest.as_deref() != Some(claims.action_digest.as_str())
+        || event.policy_digest.as_deref() != Some(claims.policy_digest.as_str())
+        || event.context_digest.as_deref() != Some(claims.context_digest.as_str())
     {
         return Err(EvidenceError::ReceiptBindingMismatch);
     }
