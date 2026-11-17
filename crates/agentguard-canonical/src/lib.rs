@@ -150,10 +150,16 @@ impl<'de> Visitor<'de> for StrictValueVisitor {
         Ok(StrictValue::Unsigned(value))
     }
 
-    fn visit_f64<E>(self, _value: f64) -> Result<Self::Value, E>
+    fn visit_f64<E>(self, value: f64) -> Result<Self::Value, E>
     where
         E: de::Error,
     {
+        // RFC 8785 serializes every negative-zero representation as the
+        // integer token "0". Preserve that rule as the sole numeric exception
+        // to this profile's prohibition on floating-point values.
+        if value == 0.0 && value.is_sign_negative() {
+            return Ok(StrictValue::Integer(0));
+        }
         Err(E::custom("floating-point values are not allowed"))
     }
 
@@ -336,7 +342,13 @@ mod tests {
 
     #[test]
     fn canonicalizes_negative_zero_as_zero() {
-        assert_eq!(canonicalize_json(b"-0").unwrap(), b"0");
+        for input in [b"-0".as_slice(), b"-0.0", b"-0e0"] {
+            assert_eq!(canonicalize_json(input).unwrap(), b"0");
+        }
+        assert_eq!(
+            canonicalize_json(b"0.0"),
+            Err(CanonicalError::FloatNotAllowed)
+        );
     }
 
     #[test]
