@@ -94,7 +94,7 @@ pub fn evaluate_and_record<K, S, R, C>(
 where
     K: PolicyKeyResolver,
     S: EvidenceStore,
-    R: EvidenceReceiptSigner,
+    R: IdentifiedEvidenceReceiptSigner,
     C: RuntimeClock,
 {
     let result = evaluate(bundle, request, keys)?;
@@ -118,7 +118,7 @@ where
             agentguard_core::Decision::Deny => "DENY",
             agentguard_core::Decision::RequireApproval => "REQUIRE_APPROVAL",
         }.to_owned()),
-        reason_codes: vec![format!("{:?}", result.reason).to_ascii_uppercase()],
+        reason_codes: vec![match result.reason { agentguard_policy::DecisionReason::AllowRuleMatched => "ALLOW_RULE_MATCHED", agentguard_policy::DecisionReason::DenyRuleMatched => "DENY_RULE_MATCHED", agentguard_policy::DecisionReason::ApprovalProfileRequired => "APPROVAL_PROFILE_REQUIRED", agentguard_policy::DecisionReason::NoMatchingAllowRule => "NO_MATCHING_ALLOW_RULE", }.to_owned()],
     };
 
     let appended = append_with_durable_receipt(
@@ -131,7 +131,7 @@ where
         // service key ID is read from the returned signature envelope below.
         // append_with_durable_receipt requires it before signing, so the
         // configured key ID is supplied through the signer port contract.
-        &evidence_signing_key_id(signer)?,
+        signer.key_id(),
     )?;
 
     Ok(RecordedDecisionV1 {
@@ -148,12 +148,3 @@ pub trait IdentifiedEvidenceReceiptSigner: EvidenceReceiptSigner {
     fn key_id(&self) -> &str;
 }
 
-fn evidence_signing_key_id<R: EvidenceReceiptSigner>(
-    _signer: &R,
-) -> Result<String, RuntimeError> {
-    // This helper is replaced by the stronger IdentifiedEvidenceReceiptSigner
-    // bound on the public coordinator; kept private to avoid key-ID injection.
-    Err(RuntimeError::Evidence(
-        agentguard_evidence::EvidenceError::InvalidReceipt,
-    ))
-}
