@@ -154,7 +154,8 @@ pub struct ConditionV1 {
     pub field_id: String,
     pub operator: ConditionOperator,
     #[serde(default)]
-    #[serde(default, skip_serializing_if = "Option::is_none")]\n    pub value: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub value: Option<Value>,
     #[serde(default)]
     pub max_age_seconds: Option<u64>,
     #[serde(default)]
