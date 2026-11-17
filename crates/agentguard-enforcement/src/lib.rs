@@ -238,13 +238,13 @@ where
     let snapshot = verify_current_revocation(keys, revocation_source, high_water_store, &now_utc)?;
 
     require_envelope_subjects_active(envelope, &snapshot)?;
-    verify_attestation_evidence(envelope, evidence_receipt, evidence_store, keys, &snapshot)?;
     envelope.verify_all_signatures(
         &verification_keys.permit.public_key,
         &verification_keys.challenge.public_key,
         &verification_keys.attestation.public_key,
         &verification_keys.outer.public_key,
     )?;
+    verify_attestation_evidence(envelope, evidence_receipt, evidence_store, keys, &snapshot)?;
 
     consume_permit(envelope, expected, permit_store, &now_utc)
 }
