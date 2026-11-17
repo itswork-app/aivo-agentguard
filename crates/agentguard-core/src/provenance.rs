@@ -16,8 +16,8 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
-    CanonicalizationError, CryptoError, SignatureAlgorithm, SignatureEnvelope,
-    canonical_json, hex_digest, verify_ed25519,
+    CanonicalizationError, CryptoError, SignatureAlgorithm, SignatureEnvelope, canonical_json,
+    hex_digest, verify_ed25519,
 };
 
 const DSSE_PAYLOAD_TYPE: &str = "application/vnd.in-toto+json";
@@ -102,7 +102,11 @@ pub struct SlsaBuildDefinitionV1 {
     pub build_type: String,
     #[serde(rename = "externalParameters")]
     pub external_parameters: Value,
-    #[serde(rename = "internalParameters", default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "internalParameters",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
     pub internal_parameters: Option<Value>,
     #[serde(rename = "resolvedDependencies", default)]
     pub resolved_dependencies: Vec<SlsaResolvedDependencyV1>,
@@ -141,7 +145,11 @@ pub struct SlsaRunMetadataV1 {
     pub invocation_id: String,
     #[serde(rename = "startedOn", default, skip_serializing_if = "Option::is_none")]
     pub started_on: Option<String>,
-    #[serde(rename = "finishedOn", default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "finishedOn",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
     pub finished_on: Option<String>,
 }
 
@@ -307,7 +315,10 @@ fn validate_manifest(manifest: &EvaluatorReleaseManifestV1) -> Result<(), Proven
     validate_digest(&manifest.artifact_sha256)?;
     validate_digest(&manifest.cargo_lock_sha256)?;
     validate_digest(&manifest.provenance_statement_sha256)?;
-    if !manifest.source_commit.bytes().all(|b| b.is_ascii_hexdigit())
+    if !manifest
+        .source_commit
+        .bytes()
+        .all(|b| b.is_ascii_hexdigit())
         || !matches!(manifest.source_commit.len(), 40 | 64)
     {
         return Err(ProvenanceError::InvalidManifest);
@@ -359,15 +370,23 @@ fn validate_statement(
         }
     }
 
-    let source_found = predicate.build_definition.resolved_dependencies.iter().any(|dependency| {
-        dependency.uri.starts_with("git+")
-            && dependency.uri.contains(&manifest.source_repository)
-            && dependency.digest.get("gitCommit") == Some(&manifest.source_commit)
-    });
-    let lock_found = predicate.build_definition.resolved_dependencies.iter().any(|dependency| {
-        dependency.uri.contains("Cargo.lock")
-            && dependency.digest.get("sha256") == Some(&manifest.cargo_lock_sha256)
-    });
+    let source_found = predicate
+        .build_definition
+        .resolved_dependencies
+        .iter()
+        .any(|dependency| {
+            dependency.uri.starts_with("git+")
+                && dependency.uri.contains(&manifest.source_repository)
+                && dependency.digest.get("gitCommit") == Some(&manifest.source_commit)
+        });
+    let lock_found = predicate
+        .build_definition
+        .resolved_dependencies
+        .iter()
+        .any(|dependency| {
+            dependency.uri.contains("Cargo.lock")
+                && dependency.digest.get("sha256") == Some(&manifest.cargo_lock_sha256)
+        });
     if !source_found || !lock_found {
         return Err(ProvenanceError::ManifestBindingMismatch);
     }
@@ -418,7 +437,9 @@ mod tests {
                     internal_parameters: None,
                     resolved_dependencies: vec![
                         SlsaResolvedDependencyV1 {
-                            uri: "git+https://github.com/itswork-app/aivo-agentguard@refs/heads/main".into(),
+                            uri:
+                                "git+https://github.com/itswork-app/aivo-agentguard@refs/heads/main"
+                                    .into(),
                             digest: BTreeMap::from([("gitCommit".into(), source_commit.clone())]),
                         },
                         SlsaResolvedDependencyV1 {
@@ -428,7 +449,9 @@ mod tests {
                     ],
                 },
                 run_details: SlsaRunDetailsV1 {
-                    builder: SlsaBuilderV1 { id: "https://github.com/actions/runner".into() },
+                    builder: SlsaBuilderV1 {
+                        id: "https://github.com/actions/runner".into(),
+                    },
                     metadata: SlsaRunMetadataV1 {
                         invocation_id: "run-123".into(),
                         started_on: None,
@@ -452,7 +475,8 @@ mod tests {
             rust_toolchain: "1.100.0".into(),
             target_triple: "x86_64-unknown-linux-gnu".into(),
             builder_identity: "https://github.com/actions/runner".into(),
-            workflow_identity: "https://github.com/itswork-app/aivo-agentguard/.github/workflows/ci.yml".into(),
+            workflow_identity:
+                "https://github.com/itswork-app/aivo-agentguard/.github/workflows/ci.yml".into(),
             build_invocation: "run-123".into(),
             provenance_statement_sha256: statement_digest,
         };
@@ -479,7 +503,8 @@ mod tests {
             &manifest.artifact_sha256,
             signing_key.verifying_key().as_bytes(),
             "build-provenance-key",
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(verified.release_id, "release-1");
         assert_eq!(verified.source_commit, manifest.source_commit);
     }
