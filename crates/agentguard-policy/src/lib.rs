@@ -153,7 +153,7 @@ pub struct ConditionV1 {
     pub field_id: String,
     pub operator: ConditionOperator,
     #[serde(default)]
-    pub value: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]\n    pub value: Option<Value>,
     #[serde(default)]
     pub max_age_seconds: Option<u64>,
     #[serde(default)]
@@ -382,7 +382,7 @@ fn validate_bundle(bundle: &PolicyBundleV1) -> Result<(), PolicyError> {
 
     let mut rule_ids = BTreeSet::new();
     for rule in &bundle.rules {
-        if !valid_identifier(&rule.rule_id) || !rule_ids.insert(&rule.rule_id) {
+        if !valid_identifier(&rule.rule_id) || !rule_ids.insert(rule.rule_id.clone()) {
             return Err(PolicyError::InvalidRuleIdentifier);
         }
         if rule.actions.is_empty()
@@ -429,7 +429,7 @@ fn validate_bundle(bundle: &PolicyBundleV1) -> Result<(), PolicyError> {
         if !valid_identifier(&profile.profile_id)
             || !valid_identifier(&profile.version)
             || profile.min_approvals == 0
-            || !profile_ids.insert(&profile.profile_id)
+            || !profile_ids.insert(profile.profile_id.clone())
             || (profile.eligible_principal_ids.is_empty() && profile.eligible_role_ids.is_empty())
             || profile
                 .eligible_principal_ids
