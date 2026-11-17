@@ -28,12 +28,5 @@ jobs:
         run: cargo fmt --all -- --check
       - name: Run Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
-      - name: Export generated lockfile for maintainer review
-        if: github.ref == 'refs/heads/feat/g3-protocol-foundation'
-        run: |
-          echo CARGO_LOCK_BEGIN
-          base64 -w0 Cargo.lock
-          echo
-          echo CARGO_LOCK_END
       - name: Run tests
         run: cargo test --workspace --all-targets
