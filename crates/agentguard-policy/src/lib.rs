@@ -734,7 +734,10 @@ mod tests {
         );
         bundle.rules.reverse();
         resign(&mut bundle, &[42_u8; 32]);
-        assert_eq!(evaluate(&bundle, &request, &keys).unwrap().decision, Decision::Deny);
+        assert_eq!(
+            evaluate(&bundle, &request, &keys).unwrap().decision,
+            Decision::Deny
+        );
     }
 
     #[test]
