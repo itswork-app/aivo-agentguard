@@ -342,7 +342,10 @@ mod tests {
     #[test]
     fn enforces_input_size_and_parser_nesting_limits() {
         let oversized = vec![b' '; MAX_CANONICAL_INPUT_BYTES + 1];
-        assert_eq!(canonicalize_json(&oversized), Err(CanonicalError::InputTooLarge));
+        assert_eq!(
+            canonicalize_json(&oversized),
+            Err(CanonicalError::InputTooLarge)
+        );
 
         let deeply_nested = format!("{}null{}", "[".repeat(130), "]".repeat(130));
         assert_eq!(
