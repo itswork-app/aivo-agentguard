@@ -1,0 +1,400 @@
+//! Strict AgentGuard canonical JSON and domain-separated SHA-256 primitives.
+//!
+//! The accepted JSON profile is intentionally narrower than general RFC 8785:
+//! floating-point values are forbidden and integers must be IEEE-754 safe
+//! integers. Large or exact numeric values belong in schema-defined strings.
+
+use serde::de::{self, Deserialize, Deserializer, MapAccess, SeqAccess, Visitor};
+use sha2::{Digest, Sha256};
+use std::collections::HashSet;
+use std::fmt;
+
+/// Maximum accepted raw JSON input size (1 MiB).
+pub const MAX_CANONICAL_INPUT_BYTES: usize = 1_048_576;
+
+/// Maximum absolute integer value accepted by the AgentGuard v1 profile.
+pub const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
+
+/// Stable, non-sensitive canonicalization failure categories.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CanonicalError {
+    /// The raw input exceeds the configured byte limit.
+    InputTooLarge,
+    /// The input is not valid UTF-8 JSON or violates the JSON grammar.
+    InvalidJson,
+    /// An object contains a duplicate decoded member name.
+    DuplicateKey,
+    /// A floating-point or fractional numeric value was supplied.
+    FloatNotAllowed,
+    /// An integer is outside the interoperable safe integer range.
+    UnsafeInteger,
+    /// The parser's maximum nesting depth was exceeded.
+    NestingLimitExceeded,
+    /// Canonical serialization failed unexpectedly.
+    SerializationFailure,
+}
+
+impl fmt::Display for CanonicalError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let message = match self {
+            Self::InputTooLarge => "canonical JSON input exceeds the byte limit",
+            Self::InvalidJson => "input is not valid JSON",
+            Self::DuplicateKey => "JSON object contains a duplicate member name",
+            Self::FloatNotAllowed => "floating-point values are not allowed",
+            Self::UnsafeInteger => "integer is outside the safe integer range",
+            Self::NestingLimitExceeded => "JSON nesting limit exceeded",
+            Self::SerializationFailure => "canonical serialization failed",
+        };
+        formatter.write_str(message)
+    }
+}
+
+impl std::error::Error for CanonicalError {}
+
+/// Closed set of AgentGuard v1 digest domains.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DigestDomain {
+    /// Request identity and request content.
+    Request,
+    /// Action content.
+    Action,
+    /// Policy content.
+    Policy,
+    /// Permit content.
+    Permit,
+    /// Evidence event content.
+    Event,
+}
+
+impl DigestDomain {
+    /// Returns the exact domain-separation bytes, including the trailing NUL.
+    #[must_use]
+    pub const fn separator(self) -> &'static [u8] {
+        match self {
+            Self::Request => b"AIVO-AGENTGUARD-REQUEST-V1\0",
+            Self::Action => b"AIVO-AGENTGUARD-ACTION-V1\0",
+            Self::Policy => b"AIVO-AGENTGUARD-POLICY-V1\0",
+            Self::Permit => b"AIVO-AGENTGUARD-PERMIT-V1\0",
+            Self::Event => b"AIVO-AGENTGUARD-EVENT-V1\0",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum StrictValue {
+    Null,
+    Bool(bool),
+    Integer(i64),
+    Unsigned(u64),
+    String(String),
+    Array(Vec<Self>),
+    Object(Vec<(String, Self)>),
+}
+
+impl<'de> Deserialize<'de> for StrictValue {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_any(StrictValueVisitor)
+    }
+}
+
+struct StrictValueVisitor;
+
+impl<'de> Visitor<'de> for StrictValueVisitor {
+    type Value = StrictValue;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("an AgentGuard v1 JSON value")
+    }
+
+    fn visit_unit<E>(self) -> Result<Self::Value, E> {
+        Ok(StrictValue::Null)
+    }
+
+    fn visit_none<E>(self) -> Result<Self::Value, E> {
+        Ok(StrictValue::Null)
+    }
+
+    fn visit_bool<E>(self, value: bool) -> Result<Self::Value, E> {
+        Ok(StrictValue::Bool(value))
+    }
+
+    fn visit_i64<E>(self, value: i64) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        if value.unsigned_abs() > MAX_SAFE_INTEGER {
+            return Err(E::custom("integer is outside the safe integer range"));
+        }
+        Ok(StrictValue::Integer(value))
+    }
+
+    fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        if value > MAX_SAFE_INTEGER {
+            return Err(E::custom("integer is outside the safe integer range"));
+        }
+        Ok(StrictValue::Unsigned(value))
+    }
+
+    fn visit_f64<E>(self, _value: f64) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Err(E::custom("floating-point values are not allowed"))
+    }
+
+    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E> {
+        Ok(StrictValue::String(value.to_owned()))
+    }
+
+    fn visit_string<E>(self, value: String) -> Result<Self::Value, E> {
+        Ok(StrictValue::String(value))
+    }
+
+    fn visit_seq<A>(self, mut sequence: A) -> Result<Self::Value, A::Error>
+    where
+        A: SeqAccess<'de>,
+    {
+        let mut values = Vec::new();
+        while let Some(value) = sequence.next_element()? {
+            values.push(value);
+        }
+        Ok(StrictValue::Array(values))
+    }
+
+    fn visit_map<A>(self, mut object: A) -> Result<Self::Value, A::Error>
+    where
+        A: MapAccess<'de>,
+    {
+        let mut seen = HashSet::new();
+        let mut entries = Vec::new();
+        while let Some(key) = object.next_key::<String>()? {
+            if !seen.insert(key.clone()) {
+                return Err(de::Error::custom("duplicate object member"));
+            }
+            let value = object.next_value()?;
+            entries.push((key, value));
+        }
+        Ok(StrictValue::Object(entries))
+    }
+}
+
+/// Parses and canonicalizes raw JSON under the AgentGuard v1 numeric profile.
+///
+/// Raw bytes are required so duplicate keys can be detected before a generic
+/// map representation can discard them.
+pub fn canonicalize_json(input: &[u8]) -> Result<Vec<u8>, CanonicalError> {
+    if input.len() > MAX_CANONICAL_INPUT_BYTES {
+        return Err(CanonicalError::InputTooLarge);
+    }
+
+    let value = serde_json::from_slice::<StrictValue>(input).map_err(|error| {
+        let message = error.to_string();
+        if message.contains("duplicate object member") {
+            CanonicalError::DuplicateKey
+        } else if message.contains("floating-point values are not allowed") {
+            CanonicalError::FloatNotAllowed
+        } else if message.contains("integer is outside the safe integer range") {
+            CanonicalError::UnsafeInteger
+        } else if message.contains("recursion limit exceeded") {
+            CanonicalError::NestingLimitExceeded
+        } else {
+            CanonicalError::InvalidJson
+        }
+    })?;
+
+    let mut output = Vec::with_capacity(input.len());
+    write_canonical(&value, &mut output)?;
+    Ok(output)
+}
+
+/// Computes a raw 32-byte SHA-256 digest over domain separator + canonical JSON.
+pub fn digest_json(
+    domain: DigestDomain,
+    input: &[u8],
+) -> Result<[u8; 32], CanonicalError> {
+    let canonical = canonicalize_json(input)?;
+    let mut hasher = Sha256::new();
+    hasher.update(domain.separator());
+    hasher.update(canonical);
+    Ok(hasher.finalize().into())
+}
+
+/// Computes a lowercase 64-character hexadecimal domain-separated digest.
+pub fn digest_hex(
+    domain: DigestDomain,
+    input: &[u8],
+) -> Result<String, CanonicalError> {
+    let digest = digest_json(domain, input)?;
+    let mut output = String::with_capacity(64);
+    for byte in digest {
+        use fmt::Write as _;
+        write!(&mut output, "{byte:02x}").map_err(|_| CanonicalError::SerializationFailure)?;
+    }
+    Ok(output)
+}
+
+fn write_canonical(value: &StrictValue, output: &mut Vec<u8>) -> Result<(), CanonicalError> {
+    match value {
+        StrictValue::Null => output.extend_from_slice(b"null"),
+        StrictValue::Bool(true) => output.extend_from_slice(b"true"),
+        StrictValue::Bool(false) => output.extend_from_slice(b"false"),
+        StrictValue::Integer(number) => output.extend_from_slice(number.to_string().as_bytes()),
+        StrictValue::Unsigned(number) => output.extend_from_slice(number.to_string().as_bytes()),
+        StrictValue::String(value) => {
+            let encoded =
+                serde_json::to_string(value).map_err(|_| CanonicalError::SerializationFailure)?;
+            output.extend_from_slice(encoded.as_bytes());
+        }
+        StrictValue::Array(values) => {
+            output.push(b'[');
+            for (index, item) in values.iter().enumerate() {
+                if index > 0 {
+                    output.push(b',');
+                }
+                write_canonical(item, output)?;
+            }
+            output.push(b']');
+        }
+        StrictValue::Object(entries) => {
+            let mut sorted: Vec<_> = entries.iter().collect();
+            sorted.sort_by(|(left, _), (right, _)| left.encode_utf16().cmp(right.encode_utf16()));
+
+            output.push(b'{');
+            for (index, (key, item)) in sorted.into_iter().enumerate() {
+                if index > 0 {
+                    output.push(b',');
+                }
+                let encoded =
+                    serde_json::to_string(key).map_err(|_| CanonicalError::SerializationFailure)?;
+                output.extend_from_slice(encoded.as_bytes());
+                output.push(b':');
+                write_canonical(item, output)?;
+            }
+            output.push(b'}');
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn canonicalizes_recursive_objects_and_preserves_array_order() {
+        let input = br#" { "z": [ {"b":2,"a":1}, 3 ], "a": true } "#;
+        assert_eq!(
+            canonicalize_json(input).unwrap(),
+            br#"{"a":true,"z":[{"a":1,"b":2},3]}"#
+        );
+    }
+
+    #[test]
+    fn sorts_object_keys_by_utf16_code_units() {
+        let input = r#"{"\uE000":1,"\uD800\uDC00":2}"#.as_bytes();
+        assert_eq!(
+            canonicalize_json(input).unwrap(),
+            "{\"𐀀\":2,\"\":1}".as_bytes()
+        );
+    }
+
+    #[test]
+    fn rejects_duplicate_keys_at_every_depth() {
+        assert_eq!(
+            canonicalize_json(br#"{"a":1,"a":2}"#),
+            Err(CanonicalError::DuplicateKey)
+        );
+        assert_eq!(
+            canonicalize_json(br#"{"outer":{"a":1,"a":2}}"#),
+            Err(CanonicalError::DuplicateKey)
+        );
+        assert_eq!(
+            canonicalize_json(br#"{"a":1,"\u0061":2}"#),
+            Err(CanonicalError::DuplicateKey)
+        );
+    }
+
+    #[test]
+    fn rejects_floats_and_unsafe_integers() {
+        assert_eq!(
+            canonicalize_json(br#"{"amount":1.0}"#),
+            Err(CanonicalError::FloatNotAllowed)
+        );
+        assert_eq!(
+            canonicalize_json(br#"{"amount":9007199254740992}"#),
+            Err(CanonicalError::UnsafeInteger)
+        );
+        assert_eq!(
+            canonicalize_json(br#"{"amount":-9007199254740992}"#),
+            Err(CanonicalError::UnsafeInteger)
+        );
+        assert_eq!(
+            canonicalize_json(br#"{"amount":9007199254740991}"#).unwrap(),
+            br#"{"amount":9007199254740991}"#
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_utf8_and_lone_surrogates() {
+        assert_eq!(
+            canonicalize_json(&[b'"', 0xff, b'"']),
+            Err(CanonicalError::InvalidJson)
+        );
+        assert_eq!(
+            canonicalize_json(br#""\ud800""#),
+            Err(CanonicalError::InvalidJson)
+        );
+    }
+
+    #[test]
+    fn equivalent_json_inputs_have_identical_canonical_bytes() {
+        let first = canonicalize_json(br#"{"b":2,"a":1}"#).unwrap();
+        let second = canonicalize_json(br#" { "a" : 1, "b" : 2 } "#).unwrap();
+        assert_eq!(first, second);
+    }
+
+    #[test]
+    fn domain_separated_golden_vectors_match() {
+        let input = br#"{"a":1}"#;
+        let vectors = [
+            (
+                DigestDomain::Request,
+                "79df7b062753d4be8799d067dc6ac7a46d11d2f0dadebb2a4f0cda08469050a0",
+            ),
+            (
+                DigestDomain::Action,
+                "68fdf699b32a715fc457fc1a9fc85c2631d2171f34b907deb2c2b5ac51f8b9ca",
+            ),
+            (
+                DigestDomain::Policy,
+                "642d1bcac4d75ae29280230c3403d4e5e2f8f8993807aee08279ab85175bcdc5",
+            ),
+            (
+                DigestDomain::Permit,
+                "b873e3ce4b09c0a8ff256bc436adec23fe2c1de9ef7104f0809fa2471ec16016",
+            ),
+            (
+                DigestDomain::Event,
+                "57f571751bf4e6cfe4b4a6ab95c2bf3ac5de13e1587dd3863fbce26a97dd054e",
+            ),
+        ];
+
+        for (domain, expected) in vectors {
+            assert_eq!(digest_hex(domain, input).unwrap(), expected);
+        }
+    }
+
+    #[test]
+    fn digest_is_bound_to_domain_and_nul_terminated_separator() {
+        let request = digest_json(DigestDomain::Request, br#"{"a":1}"#).unwrap();
+        let action = digest_json(DigestDomain::Action, br#"{"a":1}"#).unwrap();
+        assert_ne!(request, action);
+        assert_eq!(DigestDomain::Request.separator().last(), Some(&0));
+    }
+}
