@@ -30,6 +30,7 @@
 - `specifications/CONTEXT-TRUST-MODEL.md`: context provenance and freshness requirements.
 - `specifications/EVIDENCE-FORMAT.md`: append-only evidence and hash-chain envelope.
 - `implementation/EVIDENCE-SERVICE-IMPLEMENTATION.md`: current evidence implementation slice, storage/signer contracts, and production gates.
+- `implementation/EVALUATOR-PROVENANCE-IMPLEMENTATION.md`: DSSE/in-toto/SLSA provenance verification contract and release-manifest gates.
 - `specifications/API-CONTRACT-V1.md`: transport-neutral Rust API contract.
 - `specifications/PERMIT-ENVELOPE-V2.md`: versioned outer envelope binding the frozen G1 permit to G3 attestation and policy provenance.
 
