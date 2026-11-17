@@ -6,8 +6,8 @@
 mod canonical;
 mod crypto;
 mod permit;
-mod provenance;
 mod protocol;
+mod provenance;
 mod revocation;
 
 pub use canonical::{CanonicalizationError, canonical_json, domain_digest, hex_digest};
@@ -16,18 +16,18 @@ pub use permit::{
     AttestationBindingV1, AuthorizationPermitV1, PermitEnvelopeError, PermitEnvelopeV2,
     PolicyProvenanceV1,
 };
-pub use provenance::{
-    DsseEnvelopeV1, DsseSignatureV1, EvaluatorReleaseManifestV1, InTotoStatementV1,
-    InTotoSubjectV1, ProvenanceError, SlsaBuildDefinitionV1, SlsaBuilderV1,
-    SlsaProvenancePredicateV1, SlsaResolvedDependencyV1, SlsaRunDetailsV1,
-    SlsaRunMetadataV1, VerifiedEvaluatorArtifactV1, verify_evaluator_provenance,
-};
 pub use protocol::{
     AttestationVerificationError, AuthorizationAttestationV1, ChallengeConsumptionError,
     ChallengeConsumptionV1, ChallengeReplayStore, ChallengeReplayStoreError,
     ChallengeVerificationError, Decision, DecisionEventRef, EvidenceReceiptRef, KeyPurpose,
     ProtocolShapeError, SignatureAlgorithm, SignatureEnvelope, SignedAuthorizationAttestationV1,
     SignedSigningChallengeV1, SigningChallengeV1, consume_attested_challenge,
+};
+pub use provenance::{
+    DsseEnvelopeV1, DsseSignatureV1, EvaluatorReleaseManifestV1, InTotoStatementV1,
+    InTotoSubjectV1, ProvenanceError, SlsaBuildDefinitionV1, SlsaBuilderV1,
+    SlsaProvenancePredicateV1, SlsaResolvedDependencyV1, SlsaRunDetailsV1, SlsaRunMetadataV1,
+    VerifiedEvaluatorArtifactV1, verify_evaluator_provenance,
 };
 pub use revocation::{
     RevocationEntryV1, RevocationError, RevocationHighWaterMark, RevocationHighWaterMarkStore,
