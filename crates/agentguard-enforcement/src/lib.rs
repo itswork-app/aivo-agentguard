@@ -10,7 +10,9 @@ use agentguard_core::{
     RevocationPersistenceError, RevocationStatus, RevocationSubjectType,
     SignedRevocationSnapshotV1, persist_verified_snapshot,
 };
-use agentguard_evidence::{EvidenceEventType, EvidenceStore, SignedEvidenceReceiptV1, verify_receipt_read_back};
+use agentguard_evidence::{
+    EvidenceEventType, EvidenceStore, SignedEvidenceReceiptV1, verify_receipt_read_back,
+};
 use serde::{Deserialize, Serialize};
 
 /// Public key material resolved for one exact key ID and cryptographic purpose.
@@ -394,7 +396,9 @@ where
     let attestation = &envelope.authorization_attestation_v1.claims;
     let claims = &receipt.claims;
     let receipt_digest = agentguard_core::hex_digest(
-        &receipt.digest().map_err(|error| EnforcementError::Evidence(error.to_string()))?,
+        &receipt
+            .digest()
+            .map_err(|error| EnforcementError::Evidence(error.to_string()))?,
     );
     if claims.receipt_id != attestation.evidence_receipt_ref.receipt_id
         || receipt_digest != attestation.evidence_receipt_ref.receipt_digest
@@ -413,13 +417,13 @@ where
     }
 
     let key = resolve_key(keys, &claims.evidence_key_id, KeyPurpose::EvidenceService)?;
-    require_active(snapshot, RevocationSubjectType::EvidenceServiceKey, &claims.evidence_key_id)?;
-    let event = verify_receipt_read_back(
-        store,
-        receipt,
-        &key.public_key,
+    require_active(
+        snapshot,
+        RevocationSubjectType::EvidenceServiceKey,
         &claims.evidence_key_id,
-    ).map_err(|error| EnforcementError::Evidence(error.to_string()))?;
+    )?;
+    let event = verify_receipt_read_back(store, receipt, &key.public_key, &claims.evidence_key_id)
+        .map_err(|error| EnforcementError::Evidence(error.to_string()))?;
 
     if event.tenant_id != attestation.tenant_id
         || event.stream_id != attestation.decision_event_ref.stream_id
