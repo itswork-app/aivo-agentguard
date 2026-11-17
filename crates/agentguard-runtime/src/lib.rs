@@ -66,6 +66,8 @@ pub enum RuntimeError {
     Clock(#[from] RuntimeClockError),
     #[error("durable decision evidence failed: {0}")]
     Evidence(#[from] agentguard_evidence::EvidenceError),
+    #[error("evidence metadata tenant does not match the evaluated request")]
+    TenantMismatch,
 }
 
 /// Evaluate a signed policy, then durably append and read back its decision
@@ -97,6 +99,30 @@ where
     R: IdentifiedEvidenceReceiptSigner,
     C: RuntimeClock,
 {
+    if evidence.actor_ref.trim().is_empty()
+        || evidence.actor_ref.trim() != evidence.actor_ref
+        || evidence.request_id.trim().is_empty()
+        || evidence.request_id.trim() != evidence.request_id
+        || evidence.event_id.trim().is_empty()
+        || evidence.event_id.trim() != evidence.event_id
+        || evidence.receipt_id.trim().is_empty()
+        || evidence.receipt_id.trim() != evidence.receipt_id
+        || evidence.stream_id.trim().is_empty()
+        || evidence.stream_id.trim() != evidence.stream_id
+    {
+        return Err(RuntimeError::Evidence(
+            agentguard_evidence::EvidenceError::InvalidEvent,
+        ));
+    }
+    if signer.key_id().trim().is_empty() || signer.key_id().trim() != signer.key_id() {
+        return Err(RuntimeError::Evidence(
+            agentguard_evidence::EvidenceError::InvalidReceipt,
+        ));
+    }
+    if evidence.request_id.is_empty() || request.tenant_id.is_empty() {
+        return Err(RuntimeError::TenantMismatch);
+    }
+
     let result = evaluate(bundle, request, keys)?;
     let timestamp = clock.now_utc()?;
 
@@ -127,10 +153,6 @@ where
         &draft,
         &evidence.receipt_id,
         &timestamp,
-        // The signer is authoritative for the key identity; the evidence
-        // service key ID is read from the returned signature envelope below.
-        // append_with_durable_receipt requires it before signing, so the
-        // configured key ID is supplied through the signer port contract.
         signer.key_id(),
     )?;
 
@@ -140,9 +162,9 @@ where
     })
 }
 
-/// Resolve the configured evidence key identifier from the signer boundary.
-/// Signers must expose a stable key ID and must never accept caller-selected
-/// key material or purpose changes.
+/// Evidence signer with a fixed, purpose-scoped key identity.
+/// Implementations must expose a stable key ID and must never accept
+/// caller-selected key material or purpose changes.
 pub trait IdentifiedEvidenceReceiptSigner: EvidenceReceiptSigner {
     /// Return the configured evidence-purpose signing key identifier.
     fn key_id(&self) -> &str;
