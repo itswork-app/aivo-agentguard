@@ -328,6 +328,30 @@ mod tests {
     }
 
     #[test]
+    fn canonical_string_escaping_matches_the_profile() {
+        let input = br#"{"s":"quote:\\" slash:/ backslash:\\\\ newline:\\n tab:\\t nul:\\u0000"}"#;
+        let expected = br#"{"s":"quote:\\" slash:/ backslash:\\\\ newline:\\n tab:\\t nul:\\u0000"}"#;
+        assert_eq!(canonicalize_json(input).unwrap(), expected);
+    }
+
+    #[test]
+    fn canonicalizes_negative_zero_as_zero() {
+        assert_eq!(canonicalize_json(b"-0").unwrap(), b"0");
+    }
+
+    #[test]
+    fn enforces_input_size_and_parser_nesting_limits() {
+        let oversized = vec![b' '; MAX_CANONICAL_INPUT_BYTES + 1];
+        assert_eq!(canonicalize_json(&oversized), Err(CanonicalError::InputTooLarge));
+
+        let deeply_nested = format!("{}null{}", "[".repeat(130), "]".repeat(130));
+        assert_eq!(
+            canonicalize_json(deeply_nested.as_bytes()),
+            Err(CanonicalError::NestingLimitExceeded)
+        );
+    }
+
+    #[test]
     fn sorts_object_keys_by_utf16_code_units() {
         let input = r#"{"\uE000":1,"\uD800\uDC00":2}"#.as_bytes();
         assert_eq!(
@@ -396,6 +420,10 @@ mod tests {
         let fixture = include_str!("../tests/vectors/domain-digests-v1.json");
         let corpus: serde_json::Value = serde_json::from_str(fixture).unwrap();
         let input = br#"{"a":1}"#;
+        assert_eq!(
+            canonicalize_json(input).unwrap(),
+            corpus["canonical_json_utf8"].as_str().unwrap().as_bytes()
+        );
 
         for vector in corpus["vectors"].as_array().unwrap() {
             let domain = match vector["domain"].as_str().unwrap() {
