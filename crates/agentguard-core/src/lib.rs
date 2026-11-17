@@ -6,6 +6,7 @@
 mod canonical;
 mod crypto;
 mod permit;
+mod provenance;
 mod protocol;
 mod revocation;
 
@@ -14,6 +15,12 @@ pub use crypto::{CryptoError, verify_ed25519};
 pub use permit::{
     AttestationBindingV1, AuthorizationPermitV1, PermitEnvelopeError, PermitEnvelopeV2,
     PolicyProvenanceV1,
+};
+pub use provenance::{
+    DsseEnvelopeV1, DsseSignatureV1, EvaluatorReleaseManifestV1, InTotoStatementV1,
+    InTotoSubjectV1, ProvenanceError, SlsaBuildDefinitionV1, SlsaBuilderV1,
+    SlsaProvenancePredicateV1, SlsaResolvedDependencyV1, SlsaRunDetailsV1,
+    SlsaRunMetadataV1, VerifiedEvaluatorArtifactV1, verify_evaluator_provenance,
 };
 pub use protocol::{
     AttestationVerificationError, AuthorizationAttestationV1, ChallengeConsumptionError,
