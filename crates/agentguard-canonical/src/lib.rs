@@ -109,11 +109,17 @@ impl<'de> Visitor<'de> for StrictValueVisitor {
         formatter.write_str("an AgentGuard v1 JSON value")
     }
 
-    fn visit_unit<E>(self) -> Result<Self::Value, E> {
+    fn visit_unit<E>(self) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
         Ok(StrictValue::Null)
     }
 
-    fn visit_none<E>(self) -> Result<Self::Value, E> {
+    fn visit_none<E>(self) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
         Ok(StrictValue::Null)
     }
 
@@ -148,11 +154,17 @@ impl<'de> Visitor<'de> for StrictValueVisitor {
         Err(E::custom("floating-point values are not allowed"))
     }
 
-    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E> {
+    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
         Ok(StrictValue::String(value.to_owned()))
     }
 
-    fn visit_string<E>(self, value: String) -> Result<Self::Value, E> {
+    fn visit_string<E>(self, value: String) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
         Ok(StrictValue::String(value))
     }
 
@@ -237,6 +249,15 @@ pub fn digest_hex(
         write!(&mut output, "{byte:02x}").map_err(|_| CanonicalError::SerializationFailure)?;
     }
     Ok(output)
+}
+
+fn hex_encode(bytes: &[u8]) -> String {
+    let mut output = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        use fmt::Write as _;
+        let _ = write!(&mut output, "{byte:02x}");
+    }
+    output
 }
 
 fn write_canonical(value: &StrictValue, output: &mut Vec<u8>) -> Result<(), CanonicalError> {
@@ -361,32 +382,35 @@ mod tests {
 
     #[test]
     fn domain_separated_golden_vectors_match() {
+        let fixture = include_str!("../tests/vectors/domain-digests-v1.json");
+        let corpus: serde_json::Value = serde_json::from_str(fixture).unwrap();
         let input = br#"{"a":1}"#;
-        let vectors = [
-            (
-                DigestDomain::Request,
-                "79df7b062753d4be8799d067dc6ac7a46d11d2f0dadebb2a4f0cda08469050a0",
-            ),
-            (
-                DigestDomain::Action,
-                "68fdf699b32a715fc457fc1a9fc85c2631d2171f34b907deb2c2b5ac51f8b9ca",
-            ),
-            (
-                DigestDomain::Policy,
-                "642d1bcac4d75ae29280230c3403d4e5e2f8f8993807aee08279ab85175bcdc5",
-            ),
-            (
-                DigestDomain::Permit,
-                "b873e3ce4b09c0a8ff256bc436adec23fe2c1de9ef7104f0809fa2471ec16016",
-            ),
-            (
-                DigestDomain::Event,
-                "57f571751bf4e6cfe4b4a6ab95c2bf3ac5de13e1587dd3863fbce26a97dd054e",
-            ),
-        ];
 
-        for (domain, expected) in vectors {
-            assert_eq!(digest_hex(domain, input).unwrap(), expected);
+        for vector in corpus["vectors"].as_array().unwrap() {
+            let domain = match vector["domain"].as_str().unwrap() {
+                "REQUEST" => DigestDomain::Request,
+                "ACTION" => DigestDomain::Action,
+                "POLICY" => DigestDomain::Policy,
+                "PERMIT" => DigestDomain::Permit,
+                "EVENT" => DigestDomain::Event,
+                _ => panic!("unknown digest domain in golden vector"),
+            };
+            assert_eq!(
+                digest_hex(domain, input).unwrap(),
+                vector["sha256_hex"].as_str().unwrap(),
+                "golden vector {}",
+                vector["id"].as_str().unwrap()
+            );
+            assert_eq!(
+                hex_encode(domain.separator()),
+                vector["domain_separator_hex"].as_str().unwrap()
+            );
+            let mut preimage = domain.separator().to_vec();
+            preimage.extend_from_slice(&canonicalize_json(input).unwrap());
+            assert_eq!(
+                hex_encode(&preimage),
+                vector["preimage_hex"].as_str().unwrap()
+            );
         }
     }
 
