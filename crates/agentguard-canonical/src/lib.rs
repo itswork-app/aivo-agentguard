@@ -523,10 +523,8 @@ mod tests {
                 // Array order is significant and must not be sorted.
                 let array_forward = format!("[{left},{right}]");
                 let array_reverse = format!("[{right},{left}]");
-                let canonical_array_forward =
-                    canonicalize_json(array_forward.as_bytes()).unwrap();
-                let canonical_array_reverse =
-                    canonicalize_json(array_reverse.as_bytes()).unwrap();
+                let canonical_array_forward = canonicalize_json(array_forward.as_bytes()).unwrap();
+                let canonical_array_reverse = canonicalize_json(array_reverse.as_bytes()).unwrap();
                 if left != right {
                     assert_ne!(canonical_array_forward, canonical_array_reverse);
                 }
