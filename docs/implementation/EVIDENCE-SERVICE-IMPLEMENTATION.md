@@ -43,6 +43,7 @@ A failed step returns an error and must never be treated as an authorization per
 - Signed checkpoints anchored outside the evidence store remain necessary to detect full-stream truncation or rewrite.
 - The authorization-attestation issuer integration must verify receipt signature, exact decision-event bindings, and event read-back before issuing an attestation.
 - The enforcement boundary now requires the signed receipt alongside the permit envelope, resolves the evidence key under the dedicated `EvidenceService` purpose, requires an exact ACTIVE `EvidenceServiceKey` revocation entry, verifies the receipt signature, and reads back the durable event/commit.
+- The enforcement API groups injected dependencies in `EnforcementServices`; no key or storage implementation is embedded in the verifier.
 - Before atomic permit consumption, enforcement checks that the receipt digest/ID and event tenant, stream, sequence, hash, type, request/action/policy/context digests, request ID, and `ALLOW` decision exactly match the signed authorization attestation.
 
 ## Explicit non-claims
