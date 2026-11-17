@@ -81,6 +81,10 @@ pub enum RuntimeError {
 /// function. The policy evaluator validates the policy issuer signature.
 ///
 /// This function intentionally does not turn ALLOW into an execution permit.
+///
+/// # Errors
+/// Returns an error if policy verification/evaluation, trusted time, evidence
+/// validation, durable storage/read-back, or receipt signing fails.
 pub fn evaluate_and_record<K, S, R, C>(
     bundle: &PolicyBundleV1,
     request: &EvaluationRequestV1,
@@ -190,7 +194,7 @@ mod tests {
     use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
     use ed25519_dalek::{Signer, SigningKey};
     use serde::Serialize;
-    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::{collections::BTreeMap, sync::atomic::{AtomicBool, Ordering}};
 
     struct TestKeys([u8; 32]);
 
@@ -264,7 +268,7 @@ mod tests {
             resource_type: "wallet".into(),
             resource_id: "wallet-1".into(),
             evaluated_at_unix_seconds: 1_800_000_000,
-            context: Default::default(),
+            context: BTreeMap::default(),
         };
         (
             bundle,
@@ -314,7 +318,7 @@ mod tests {
     }
 
     impl IdentifiedEvidenceReceiptSigner for TestSigner {
-        fn key_id(&self) -> &str {
+        fn key_id(&self) -> &'static str {
             "evidence-key-1"
         }
     }
