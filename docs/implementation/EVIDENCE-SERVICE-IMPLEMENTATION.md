@@ -1,6 +1,6 @@
 # Evidence Service Implementation Slice
 
-**Status:** Implementation in progress — non-production
+**Status:** Enforcement read-back integration implemented — production adapters and issuer integration pending
 **Protocol baseline:** G1/G2 v0.1.0 and G3 v0.1.0
 **Code:** `crates/agentguard-evidence`
 
@@ -42,6 +42,8 @@ A failed step returns an error and must never be treated as an authorization per
 - A production deployment must define replication durability, backup, retention, restore, privacy minimization, and operational monitoring.
 - Signed checkpoints anchored outside the evidence store remain necessary to detect full-stream truncation or rewrite.
 - The authorization-attestation issuer integration must verify receipt signature, exact decision-event bindings, and event read-back before issuing an attestation.
+- The enforcement boundary now requires the signed receipt alongside the permit envelope, resolves the evidence key under the dedicated `EvidenceService` purpose, requires an exact ACTIVE `EvidenceServiceKey` revocation entry, verifies the receipt signature, and reads back the durable event/commit.
+- Before atomic permit consumption, enforcement checks that the receipt digest/ID and event tenant, stream, sequence, hash, type, request/action/policy/context digests, request ID, and `ALLOW` decision exactly match the signed authorization attestation.
 
 ## Explicit non-claims
 
