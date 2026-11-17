@@ -752,6 +752,43 @@ mod tests {
         assert_eq!(result.reason, DecisionReason::NoMatchingAllowRule);
     }
 
+    #[test]
+    fn equality_rejects_cross_type_comparison() {
+        let (mut bundle, request, keys) = fixture();
+        bundle.rules[0].conditions[0].value = Some(Value::Number(serde_json::Number::from(1)));
+        resign(&mut bundle, &[42_u8; 32]);
+        assert_eq!(
+            evaluate(&bundle, &request, &keys),
+            Err(PolicyError::ConditionTypeMismatch)
+        );
+    }
+
+    #[test]
+    fn issuer_identity_is_bound_by_the_trust_resolver() {
+        let (mut bundle, request, keys) = fixture();
+        bundle.issuer_id = "attacker-controlled-issuer".into();
+        resign(&mut bundle, &[42_u8; 32]);
+        assert_eq!(
+            evaluate(&bundle, &request, &keys),
+            Err(PolicyError::KeyResolution(PolicyKeyError::Unknown))
+        );
+    }
+
+    #[test]
+    fn condition_type_mismatch_does_not_become_a_non_match() {
+        let (mut bundle, request, keys) = fixture();
+        bundle.rules[0].conditions[0].operator = ConditionOperator::In;
+        bundle.rules[0].conditions[0].value = Some(Value::Array(vec![
+            Value::String("active".into()),
+            Value::Number(serde_json::Number::from(1)),
+        ]));
+        resign(&mut bundle, &[42_u8; 32]);
+        assert_eq!(
+            evaluate(&bundle, &request, &keys),
+            Err(PolicyError::ConditionTypeMismatch)
+        );
+    }
+
     fn resign(bundle: &mut PolicyBundleV1, secret: &[u8; 32]) {
         let signing = SigningKey::from_bytes(secret);
         let canonical = canonical_json(&policy_content(bundle)).unwrap();
