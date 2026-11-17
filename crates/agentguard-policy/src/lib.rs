@@ -28,7 +28,11 @@ pub trait PolicyKeyResolver: Send + Sync {
     /// # Errors
     ///
     /// Returns an error when the key is unknown, unavailable, or not trusted.
-    fn resolve_policy_issuer_key(&self, key_id: &str) -> Result<[u8; 32], PolicyKeyError>;
+    fn resolve_policy_issuer_key(
+        &self,
+        issuer_id: &str,
+        key_id: &str,
+    ) -> Result<[u8; 32], PolicyKeyError>;
 }
 
 /// Failure to resolve a trusted policy issuer key.
@@ -278,7 +282,7 @@ pub fn evaluate<K: PolicyKeyResolver>(
     {
         return Err(PolicyError::InvalidSignature);
     }
-    let public_key = keys.resolve_policy_issuer_key(&bundle.signature.key_id)?;
+    let public_key = keys.resolve_policy_issuer_key(&bundle.issuer_id, &bundle.signature.key_id)?;
     verify_ed25519(&public_key, &bundle.signature, &canonical)
         .map_err(|_| PolicyError::InvalidSignature)?;
 
@@ -517,12 +521,23 @@ fn condition_matches_value(
         return Ok(condition.operator == ConditionOperator::Exists);
     };
     match condition.operator {
-        ConditionOperator::Eq => Ok(actual == expected),
-        ConditionOperator::Neq => Ok(actual != expected),
+        ConditionOperator::Eq | ConditionOperator::Neq => {
+            if !same_scalar_type(actual, expected) {
+                return Err(PolicyError::ConditionTypeMismatch);
+            }
+            Ok(if condition.operator == ConditionOperator::Eq {
+                actual == expected
+            } else {
+                actual != expected
+            })
+        }
         ConditionOperator::In | ConditionOperator::NotIn => {
             let Value::Array(values) = expected else {
                 return Err(PolicyError::InvalidCondition);
             };
+            if values.iter().any(|value| !same_scalar_type(actual, value)) {
+                return Err(PolicyError::ConditionTypeMismatch);
+            }
             let contains = values.iter().any(|value| value == actual);
             Ok(if condition.operator == ConditionOperator::In {
                 contains
@@ -561,6 +576,18 @@ fn compare_ordered(
     })
 }
 
+fn same_scalar_type(left: &Value, right: &Value) -> bool {
+    match (left, right) {
+        (Value::String(_), Value::String(_))
+        | (Value::Bool(_), Value::Bool(_))
+        | (Value::Null, Value::Null) => true,
+        (Value::Number(left), Value::Number(right)) => {
+            integer_value(left).is_some() && integer_value(right).is_some()
+        }
+        _ => false,
+    }
+}
+
 fn integer_value(value: &serde_json::Number) -> Option<i128> {
     value
         .as_i64()
@@ -578,8 +605,12 @@ mod tests {
     struct TestKeys([u8; 32]);
 
     impl PolicyKeyResolver for TestKeys {
-        fn resolve_policy_issuer_key(&self, key_id: &str) -> Result<[u8; 32], PolicyKeyError> {
-            if key_id == "policy-key-1" {
+        fn resolve_policy_issuer_key(
+            &self,
+            issuer_id: &str,
+            key_id: &str,
+        ) -> Result<[u8; 32], PolicyKeyError> {
+            if issuer_id == "org-policy-issuer" && key_id == "policy-key-1" {
                 Ok(self.0)
             } else {
                 Err(PolicyKeyError::Unknown)
