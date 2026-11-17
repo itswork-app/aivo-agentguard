@@ -213,16 +213,28 @@ pub enum EnforcementError {
 /// Returns an error for any missing/untrusted key, invalid signature, stale or
 /// rolled-back revocation snapshot, non-ACTIVE required subject, invalid time,
 /// envelope mismatch, or permit replay/store failure.
+/// Trusted dependencies required to verify and consume a G3 permit.
+///
+/// References are injected by the host; this type owns no keys or storage.
+pub struct EnforcementServices<'a, K, C, R, H, P, E> {
+    pub keys: &'a K,
+    pub clock: &'a C,
+    pub revocation_source: &'a R,
+    pub high_water_store: &'a H,
+    pub permit_store: &'a P,
+    pub evidence_store: &'a E,
+}
+
+/// Verify all G3 signatures, fresh revocation status, durable evidence bindings,
+/// and expiry, then atomically consume the permit before returning a capability.
+///
+/// Required evidence is checked only after the attestation and envelope
+/// signatures are authenticated, and before permit consumption.
 pub fn verify_and_consume<K, C, R, H, P, E>(
     envelope: &PermitEnvelopeV2,
     expected: &ExpectedExecutionContextV1,
-    keys: &K,
-    clock: &C,
-    revocation_source: &R,
-    high_water_store: &H,
-    permit_store: &P,
-    evidence_store: &E,
     evidence_receipt: &SignedEvidenceReceiptV1,
+    services: &EnforcementServices<'_, K, C, R, H, P, E>,
 ) -> Result<ConsumedPermitV2, EnforcementError>
 where
     K: VerificationKeyResolver,
@@ -232,12 +244,17 @@ where
     P: PermitConsumptionStore,
     E: EvidenceStore,
 {
-    let now_utc = clock.now_utc()?;
+    let now_utc = services.clock.now_utc()?;
     envelope.validate_at(&now_utc)?;
     validate_expected_context(envelope, expected)?;
 
-    let verification_keys = resolve_envelope_keys(envelope, keys)?;
-    let snapshot = verify_current_revocation(keys, revocation_source, high_water_store, &now_utc)?;
+    let verification_keys = resolve_envelope_keys(envelope, services.keys)?;
+    let snapshot = verify_current_revocation(
+        services.keys,
+        services.revocation_source,
+        services.high_water_store,
+        &now_utc,
+    )?;
 
     require_envelope_subjects_active(envelope, &snapshot)?;
     envelope.verify_all_signatures(
@@ -246,9 +263,15 @@ where
         &verification_keys.attestation.public_key,
         &verification_keys.outer.public_key,
     )?;
-    verify_attestation_evidence(envelope, evidence_receipt, evidence_store, keys, &snapshot)?;
+    verify_attestation_evidence(
+        envelope,
+        evidence_receipt,
+        services.evidence_store,
+        services.keys,
+        &snapshot,
+    )?;
 
-    consume_permit(envelope, expected, permit_store, &now_utc)
+    consume_permit(envelope, expected, services.permit_store, &now_utc)
 }
 
 struct EnvelopeVerificationKeys {
