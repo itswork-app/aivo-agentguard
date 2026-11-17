@@ -409,4 +409,149 @@ mod tests {
         }];
         value
     }
+
+
+    #[test]
+    fn invalid_rule_configurations_fail_closed() {
+        let context = BTreeMap::new();
+
+        let mut empty_actions = rule("empty-actions", RuleEffect::Allow);
+        empty_actions.actions.clear();
+        assert_eq!(
+            evaluate(&bundle(vec![empty_actions]), &request(&context)).decision,
+            Decision::Deny
+        );
+
+        let mut missing_approval_profile =
+            rule("missing-profile", RuleEffect::RequireApproval);
+        missing_approval_profile.approval_profile_id = None;
+        assert_eq!(
+            evaluate(
+                &bundle(vec![missing_approval_profile]),
+                &request(&context)
+            )
+            .decision,
+            Decision::Deny
+        );
+
+        let mut unexpected_approval_profile = rule("unexpected-profile", RuleEffect::Allow);
+        unexpected_approval_profile.approval_profile_id = Some("finance-2p".into());
+        assert_eq!(
+            evaluate(
+                &bundle(vec![unexpected_approval_profile]),
+                &request(&context)
+            )
+            .decision,
+            Decision::Deny
+        );
+    }
+
+    #[test]
+    fn typed_condition_operators_have_exact_semantics() {
+        let mut context = BTreeMap::new();
+        context.insert("mode".into(), Value::String("production".into()));
+        context.insert("amount".into(), Value::Integer(500));
+        context.insert("enabled".into(), Value::Bool(true));
+
+        let mut policy_rule = rule("typed-conditions", RuleEffect::Allow);
+        policy_rule.conditions = vec![
+            Condition {
+                field: "mode".into(),
+                operator: Operator::Eq,
+                expected: Value::String("production".into()),
+            },
+            Condition {
+                field: "mode".into(),
+                operator: Operator::Neq,
+                expected: Value::String("staging".into()),
+            },
+            Condition {
+                field: "mode".into(),
+                operator: Operator::In,
+                expected: Value::Set(vec![
+                    Value::String("production".into()),
+                    Value::String("staging".into()),
+                ]),
+            },
+            Condition {
+                field: "mode".into(),
+                operator: Operator::NotIn,
+                expected: Value::Set(vec![Value::String("development".into())]),
+            },
+            Condition {
+                field: "enabled".into(),
+                operator: Operator::Exists,
+                expected: Value::Bool(true),
+            },
+            Condition {
+                field: "amount".into(),
+                operator: Operator::Gt,
+                expected: Value::Integer(499),
+            },
+            Condition {
+                field: "amount".into(),
+                operator: Operator::Gte,
+                expected: Value::Integer(500),
+            },
+            Condition {
+                field: "amount".into(),
+                operator: Operator::Lt,
+                expected: Value::Integer(501),
+            },
+            Condition {
+                field: "amount".into(),
+                operator: Operator::Lte,
+                expected: Value::Integer(500),
+            },
+        ];
+
+        assert_eq!(
+            evaluate(&bundle(vec![policy_rule.clone()]), &request(&context)).decision,
+            Decision::Allow
+        );
+
+        context.insert("amount".into(), Value::String("500".into()));
+        assert_eq!(
+            evaluate(&bundle(vec![policy_rule]), &request(&context)).decision,
+            Decision::Deny
+        );
+    }
+
+    #[test]
+    fn agent_and_resource_selectors_are_exact() {
+        let context = BTreeMap::new();
+        let mut policy_rule = rule("agent-resource", RuleEffect::Allow);
+        policy_rule.subjects = vec![SubjectSelector::Agent("agent-1".into())];
+        policy_rule.resources = vec!["wallet-1".into()];
+
+        assert_eq!(
+            evaluate(&bundle(vec![policy_rule.clone()]), &request(&context)).decision,
+            Decision::Allow
+        );
+
+        let wrong_agent = PolicyRequest {
+            principal_id: "user-1",
+            agent_id: "agent-2",
+            action_type: "wallet.transfer",
+            resource: "wallet-1",
+            context: &context,
+        };
+        assert_eq!(
+            evaluate(&bundle(vec![policy_rule.clone()]), &wrong_agent).decision,
+            Decision::Deny
+        );
+
+        let wrong_resource = PolicyRequest {
+            principal_id: "user-1",
+            agent_id: "agent-1",
+            action_type: "wallet.transfer",
+            resource: "wallet-2",
+            context: &context,
+        };
+        assert_eq!(
+            evaluate(&bundle(vec![policy_rule]), &wrong_resource).decision,
+            Decision::Deny
+        );
+    }
+
 }
