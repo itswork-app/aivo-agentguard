@@ -10,6 +10,7 @@ repository.workspace = true
 agentguard-core = { path = "../agentguard-core" }
 agentguard-policy = { path = "../agentguard-policy" }
 agentguard-evidence = { path = "../agentguard-evidence" }
+thiserror = "2"
 
 [lib]
 path = "src/lib.rs"
