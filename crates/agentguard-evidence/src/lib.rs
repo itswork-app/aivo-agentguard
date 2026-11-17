@@ -375,6 +375,7 @@ pub fn append_with_durable_receipt<S: EvidenceStore, K: EvidenceReceiptSigner>(
     evidence_key_id: &str,
 ) -> Result<EvidenceAppendResult, EvidenceError> {
     validate_draft(draft)?;
+    validate_receipt_eligible_draft(draft)?;
     identifier(receipt_id)?;
     identifier(evidence_key_id)?;
     timestamp(committed_at)?;
@@ -519,6 +520,17 @@ fn required_digest(value: Option<&String>) -> Result<String, EvidenceError> {
     digest(v)?;
     Ok(v.clone())
 }
+fn validate_receipt_eligible_draft(d: &EvidenceEventDraftV1) -> Result<(), EvidenceError> {
+    if d.event_type != EvidenceEventType::DecisionRecorded {
+        return Err(EvidenceError::InvalidReceipt);
+    }
+    required_digest(d.request_digest.as_ref())?;
+    required_digest(d.action_digest.as_ref())?;
+    required_digest(d.policy_digest.as_ref())?;
+    required_digest(d.context_digest.as_ref())?;
+    Ok(())
+}
+
 fn validate_draft(d: &EvidenceEventDraftV1) -> Result<(), EvidenceError> {
     if d.schema_version != 1
         || d.reason_codes.len() > 64
