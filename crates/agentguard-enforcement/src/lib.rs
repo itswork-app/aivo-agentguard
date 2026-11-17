@@ -230,6 +230,12 @@ pub struct EnforcementServices<'a, K, C, R, H, P, E> {
 ///
 /// Required evidence is checked only after the attestation and envelope
 /// signatures are authenticated, and before permit consumption.
+///
+/// # Errors
+///
+/// Returns an error for invalid signatures, untrusted or revoked keys, stale
+/// revocation state, evidence receipt mismatch/read-back failure, invalid time,
+/// execution-context mismatch, or permit replay/storage failure.
 pub fn verify_and_consume<K, C, R, H, P, E>(
     envelope: &PermitEnvelopeV2,
     expected: &ExpectedExecutionContextV1,
