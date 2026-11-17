@@ -10,8 +10,7 @@ use agentguard_evidence::{
     EvidenceStore, append_with_durable_receipt,
 };
 use agentguard_policy::{
-    DecisionResultV1, EvaluationRequestV1, PolicyBundleV1, PolicyError, PolicyKeyResolver,
-    evaluate,
+    DecisionResultV1, EvaluationRequestV1, PolicyBundleV1, PolicyError, PolicyKeyResolver, evaluate,
 };
 
 /// Trusted UTC timestamp provider for evidence timestamps.
@@ -139,12 +138,25 @@ where
         action_digest: Some(evidence.action_digest.clone()),
         policy_digest: Some(result.policy_digest.clone()),
         context_digest: Some(evidence.context_digest.clone()),
-        decision: Some(match result.decision {
-            agentguard_core::Decision::Allow => "ALLOW",
-            agentguard_core::Decision::Deny => "DENY",
-            agentguard_core::Decision::RequireApproval => "REQUIRE_APPROVAL",
-        }.to_owned()),
-        reason_codes: vec![match result.reason { agentguard_policy::DecisionReason::AllowRuleMatched => "ALLOW_RULE_MATCHED", agentguard_policy::DecisionReason::DenyRuleMatched => "DENY_RULE_MATCHED", agentguard_policy::DecisionReason::ApprovalProfileRequired => "APPROVAL_PROFILE_REQUIRED", agentguard_policy::DecisionReason::NoMatchingAllowRule => "NO_MATCHING_ALLOW_RULE", }.to_owned()],
+        decision: Some(
+            match result.decision {
+                agentguard_core::Decision::Allow => "ALLOW",
+                agentguard_core::Decision::Deny => "DENY",
+                agentguard_core::Decision::RequireApproval => "REQUIRE_APPROVAL",
+            }
+            .to_owned(),
+        ),
+        reason_codes: vec![
+            match result.reason {
+                agentguard_policy::DecisionReason::AllowRuleMatched => "ALLOW_RULE_MATCHED",
+                agentguard_policy::DecisionReason::DenyRuleMatched => "DENY_RULE_MATCHED",
+                agentguard_policy::DecisionReason::ApprovalProfileRequired => {
+                    "APPROVAL_PROFILE_REQUIRED"
+                }
+                agentguard_policy::DecisionReason::NoMatchingAllowRule => "NO_MATCHING_ALLOW_RULE",
+            }
+            .to_owned(),
+        ],
     };
 
     let appended = append_with_durable_receipt(
@@ -169,4 +181,3 @@ pub trait IdentifiedEvidenceReceiptSigner: EvidenceReceiptSigner {
     /// Return the configured evidence-purpose signing key identifier.
     fn key_id(&self) -> &str;
 }
-
