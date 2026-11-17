@@ -53,6 +53,7 @@ dependencies = [
  "agentguard-core",
  "agentguard-evidence",
  "agentguard-policy",
+ "thiserror",
 ]
 
 [[package]]
