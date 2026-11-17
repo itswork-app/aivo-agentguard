@@ -295,12 +295,7 @@ where
         &evidence_receipt.claims.evidence_key_id,
     )?;
 
-    consume_permit(
-        envelope,
-        expected,
-        services.permit_store,
-        &final_now_utc,
-    )
+    consume_permit(envelope, expected, services.permit_store, &final_now_utc)
 }
 
 struct EnvelopeVerificationKeys {
