@@ -182,7 +182,7 @@ mod tests {
     use super::*;
     use agentguard_core::{SignatureAlgorithm, SignatureEnvelope, canonical_json};
     use agentguard_evidence::{
-        DurableCommitRef, EvidenceEventV1, EvidenceReceiptSigner, EvidenceSignerError,
+        DurableCommitRef, EvidenceEventV1, EvidenceSignerError,
         EvidenceStoreError, EvidenceStreamHead, StoredEvidenceEvent,
     };
     use agentguard_policy::{
