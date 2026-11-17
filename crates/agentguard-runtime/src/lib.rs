@@ -194,7 +194,10 @@ mod tests {
     use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
     use ed25519_dalek::{Signer, SigningKey};
     use serde::Serialize;
-    use std::{collections::BTreeMap, sync::atomic::{AtomicBool, Ordering}};
+    use std::{
+        collections::BTreeMap,
+        sync::atomic::{AtomicBool, Ordering},
+    };
 
     struct TestKeys([u8; 32]);
 
