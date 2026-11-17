@@ -329,8 +329,8 @@ mod tests {
 
     #[test]
     fn canonical_string_escaping_matches_the_profile() {
-        let input = br#"{"s":"quote:\\" slash:/ backslash:\\\\ newline:\\n tab:\\t nul:\\u0000"}"#;
-        let expected = br#"{"s":"quote:\\" slash:/ backslash:\\\\ newline:\\n tab:\\t nul:\\u0000"}"#;
+        let input = br#"{"s":"quote:\" slash:/ backslash:\\ newline:\n tab:\t nul:\u0000"}"#;
+        let expected = br#"{"s":"quote:\" slash:/ backslash:\\ newline:\n tab:\t nul:\u0000"}"#;
         assert_eq!(canonicalize_json(input).unwrap(), expected);
     }
 
