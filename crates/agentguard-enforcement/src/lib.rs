@@ -277,7 +277,30 @@ where
         &snapshot,
     )?;
 
-    consume_permit(envelope, expected, services.permit_store, &now_utc)
+    // Evidence read-back may take time. Re-read trusted time and revocation
+    // state immediately before the single-use consume operation so expiry or
+    // a newly published revocation cannot be hidden by the earlier snapshot.
+    let final_now_utc = services.clock.now_utc()?;
+    envelope.validate_at(&final_now_utc)?;
+    let final_snapshot = verify_current_revocation(
+        services.keys,
+        services.revocation_source,
+        services.high_water_store,
+        &final_now_utc,
+    )?;
+    require_envelope_subjects_active(envelope, &final_snapshot)?;
+    require_active(
+        &final_snapshot,
+        RevocationSubjectType::EvidenceServiceKey,
+        &evidence_receipt.claims.evidence_key_id,
+    )?;
+
+    consume_permit(
+        envelope,
+        expected,
+        services.permit_store,
+        &final_now_utc,
+    )
 }
 
 struct EnvelopeVerificationKeys {
