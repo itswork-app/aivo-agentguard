@@ -8,8 +8,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use agentguard_core::{
-    Decision, SignatureEnvelope, canonical_json, domain_digest, hex_digest,
-    verify_ed25519,
+    Decision, SignatureEnvelope, canonical_json, domain_digest, hex_digest, verify_ed25519,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -319,9 +318,17 @@ pub fn evaluate<K: PolicyKeyResolver>(
             approval_profiles.into_iter().collect(),
         )
     } else if allow {
-        (Decision::Allow, DecisionReason::AllowRuleMatched, Vec::new())
+        (
+            Decision::Allow,
+            DecisionReason::AllowRuleMatched,
+            Vec::new(),
+        )
     } else {
-        (Decision::Deny, DecisionReason::NoMatchingAllowRule, Vec::new())
+        (
+            Decision::Deny,
+            DecisionReason::NoMatchingAllowRule,
+            Vec::new(),
+        )
     };
 
     Ok(DecisionResultV1 {
@@ -380,10 +387,26 @@ fn validate_bundle(bundle: &PolicyBundleV1) -> Result<(), PolicyError> {
         }
         if rule.actions.is_empty()
             || rule.actions.iter().any(|item| !valid_selector(item))
-            || rule.subjects.principal_ids.iter().any(|item| !valid_identifier(item))
-            || rule.subjects.agent_ids.iter().any(|item| !valid_identifier(item))
-            || rule.resources.resource_types.iter().any(|item| !valid_selector(item))
-            || rule.resources.resource_ids.iter().any(|item| !valid_selector(item))
+            || rule
+                .subjects
+                .principal_ids
+                .iter()
+                .any(|item| !valid_identifier(item))
+            || rule
+                .subjects
+                .agent_ids
+                .iter()
+                .any(|item| !valid_identifier(item))
+            || rule
+                .resources
+                .resource_types
+                .iter()
+                .any(|item| !valid_selector(item))
+            || rule
+                .resources
+                .resource_ids
+                .iter()
+                .any(|item| !valid_selector(item))
         {
             return Err(PolicyError::InvalidSelector);
         }
@@ -395,9 +418,7 @@ fn validate_bundle(bundle: &PolicyBundleV1) -> Result<(), PolicyError> {
             _ => {}
         }
         for condition in &rule.conditions {
-            if !valid_identifier(&condition.field_id)
-                || !valid_condition_shape(condition)
-            {
+            if !valid_identifier(&condition.field_id) || !valid_condition_shape(condition) {
                 return Err(PolicyError::InvalidCondition);
             }
         }
@@ -410,8 +431,14 @@ fn validate_bundle(bundle: &PolicyBundleV1) -> Result<(), PolicyError> {
             || profile.min_approvals == 0
             || !profile_ids.insert(&profile.profile_id)
             || (profile.eligible_principal_ids.is_empty() && profile.eligible_role_ids.is_empty())
-            || profile.eligible_principal_ids.iter().any(|id| !valid_identifier(id))
-            || profile.eligible_role_ids.iter().any(|id| !valid_identifier(id))
+            || profile
+                .eligible_principal_ids
+                .iter()
+                .any(|id| !valid_identifier(id))
+            || profile
+                .eligible_role_ids
+                .iter()
+                .any(|id| !valid_identifier(id))
         {
             return Err(PolicyError::InvalidApprovalProfile);
         }
@@ -473,7 +500,10 @@ fn matches_selectors(rule: &PolicyRuleV1, request: &EvaluationRequestV1) -> bool
             || rule.subjects.agent_ids.contains(&request.agent_id))
         && rule.actions.contains(&request.action_type)
         && (rule.resources.resource_types.is_empty()
-            || rule.resources.resource_types.contains(&request.resource_type))
+            || rule
+                .resources
+                .resource_types
+                .contains(&request.resource_type))
         && (rule.resources.resource_ids.is_empty()
             || rule.resources.resource_ids.contains(&request.resource_id))
 }
@@ -513,10 +543,7 @@ fn conditions_match(
     Ok(true)
 }
 
-fn condition_matches_value(
-    condition: &ConditionV1,
-    actual: &Value,
-) -> Result<bool, PolicyError> {
+fn condition_matches_value(condition: &ConditionV1, actual: &Value) -> Result<bool, PolicyError> {
     let Some(expected) = condition.value.as_ref() else {
         return Ok(condition.operator == ConditionOperator::Exists);
     };
@@ -674,7 +701,11 @@ mod tests {
                 },
             )]),
         };
-        (bundle, request, TestKeys(*signing.verifying_key().as_bytes()))
+        (
+            bundle,
+            request,
+            TestKeys(*signing.verifying_key().as_bytes()),
+        )
     }
 
     #[test]
@@ -695,7 +726,10 @@ mod tests {
         deny.effect = RuleEffect::Deny;
         bundle.rules.push(deny);
         resign(&mut bundle, &[42_u8; 32]);
-        assert_eq!(evaluate(&bundle, &request, &keys).unwrap().decision, Decision::Deny);
+        assert_eq!(
+            evaluate(&bundle, &request, &keys).unwrap().decision,
+            Decision::Deny
+        );
         bundle.rules.reverse();
         resign(&mut bundle, &[42_u8; 32]);
         assert_eq!(evaluate(&bundle, &request, &keys).unwrap().decision, Decision::Deny);
@@ -728,19 +762,40 @@ mod tests {
     #[test]
     fn stale_or_untrusted_context_fails_closed_as_typed_error() {
         let (bundle, mut request, keys) = fixture();
-        request.context.get_mut("account.status").unwrap().observed_at_unix_seconds = 1;
-        assert_eq!(evaluate(&bundle, &request, &keys), Err(PolicyError::ContextStale));
+        request
+            .context
+            .get_mut("account.status")
+            .unwrap()
+            .observed_at_unix_seconds = 1;
+        assert_eq!(
+            evaluate(&bundle, &request, &keys),
+            Err(PolicyError::ContextStale)
+        );
 
-        request.context.get_mut("account.status").unwrap().observed_at_unix_seconds = 90;
-        request.context.get_mut("account.status").unwrap().trust_class = TrustClass::T1;
-        assert_eq!(evaluate(&bundle, &request, &keys), Err(PolicyError::ContextUntrusted));
+        request
+            .context
+            .get_mut("account.status")
+            .unwrap()
+            .observed_at_unix_seconds = 90;
+        request
+            .context
+            .get_mut("account.status")
+            .unwrap()
+            .trust_class = TrustClass::T1;
+        assert_eq!(
+            evaluate(&bundle, &request, &keys),
+            Err(PolicyError::ContextUntrusted)
+        );
     }
 
     #[test]
     fn altered_policy_content_invalidates_signature() {
         let (mut bundle, request, keys) = fixture();
         bundle.rules[0].actions[0] = "wallet.transfer".into();
-        assert_eq!(evaluate(&bundle, &request, &keys), Err(PolicyError::InvalidSignature));
+        assert_eq!(
+            evaluate(&bundle, &request, &keys),
+            Err(PolicyError::InvalidSignature)
+        );
     }
 
     #[test]
