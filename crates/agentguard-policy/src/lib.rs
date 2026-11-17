@@ -151,6 +151,10 @@ pub fn evaluate(bundle: &PolicyBundle, request: &PolicyRequest<'_>) -> DecisionR
                     .resources
                     .iter()
                     .any(|resource| resource.trim().is_empty())
+                || rule
+                    .conditions
+                    .iter()
+                    .any(|condition| !condition_is_structurally_valid(condition))
                 || match rule.effect {
                     RuleEffect::RequireApproval => rule
                         .approval_profile_id
@@ -226,6 +230,24 @@ fn rule_matches(rule: &PolicyRule, request: &PolicyRequest<'_>) -> bool {
             .conditions
             .iter()
             .all(|condition| condition_matches(condition, request.context))
+}
+
+fn condition_is_structurally_valid(condition: &Condition) -> bool {
+    if condition.field.trim().is_empty() {
+        return false;
+    }
+
+    match condition.operator {
+        Operator::Exists => matches!(condition.expected, Value::Bool(_)),
+        Operator::In | Operator::NotIn => match &condition.expected {
+            Value::Set(values) => values.iter().all(|value| !matches!(value, Value::Set(_))),
+            _ => false,
+        },
+        Operator::Gt | Operator::Gte | Operator::Lt | Operator::Lte => {
+            matches!(condition.expected, Value::Integer(_) | Value::String(_))
+        }
+        Operator::Eq | Operator::Neq => !matches!(condition.expected, Value::Set(_)),
+    }
 }
 
 fn condition_matches(condition: &Condition, context: &BTreeMap<String, Value>) -> bool {
@@ -437,6 +459,66 @@ mod tests {
             )
             .decision,
             Decision::Deny
+        );
+    }
+
+    #[test]
+    fn malformed_condition_shapes_fail_closed() {
+        let context = BTreeMap::new();
+
+        let mut empty_field = rule("empty-field", RuleEffect::Allow);
+        empty_field.conditions = vec![Condition {
+            field: "  ".into(),
+            operator: Operator::Exists,
+            expected: Value::Bool(false),
+        }];
+        assert_eq!(
+            evaluate(&bundle(vec![empty_field]), &request(&context)).reason,
+            ReasonCode::PolicyInvalid
+        );
+
+        let mut invalid_exists = rule("invalid-exists", RuleEffect::Allow);
+        invalid_exists.conditions = vec![Condition {
+            field: "approved".into(),
+            operator: Operator::Exists,
+            expected: Value::String("true".into()),
+        }];
+        assert_eq!(
+            evaluate(&bundle(vec![invalid_exists]), &request(&context)).reason,
+            ReasonCode::PolicyInvalid
+        );
+
+        let mut invalid_membership = rule("invalid-membership", RuleEffect::Allow);
+        invalid_membership.conditions = vec![Condition {
+            field: "mode".into(),
+            operator: Operator::In,
+            expected: Value::String("production".into()),
+        }];
+        assert_eq!(
+            evaluate(&bundle(vec![invalid_membership]), &request(&context)).reason,
+            ReasonCode::PolicyInvalid
+        );
+
+        let mut invalid_ordering = rule("invalid-ordering", RuleEffect::Allow);
+        invalid_ordering.conditions = vec![Condition {
+            field: "amount".into(),
+            operator: Operator::Gt,
+            expected: Value::Bool(true),
+        }];
+        assert_eq!(
+            evaluate(&bundle(vec![invalid_ordering]), &request(&context)).reason,
+            ReasonCode::PolicyInvalid
+        );
+
+        let mut invalid_equality = rule("invalid-equality", RuleEffect::Allow);
+        invalid_equality.conditions = vec![Condition {
+            field: "mode".into(),
+            operator: Operator::Eq,
+            expected: Value::Set(vec![Value::String("production".into())]),
+        }];
+        assert_eq!(
+            evaluate(&bundle(vec![invalid_equality]), &request(&context)).reason,
+            ReasonCode::PolicyInvalid
         );
     }
 
