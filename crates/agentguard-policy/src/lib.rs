@@ -114,7 +114,11 @@ pub struct DecisionResult {
 
 impl DecisionResult {
     fn new(decision: Decision, reason: ReasonCode) -> Self {
-        Self { decision, reason, approval_profile_ids: Vec::new() }
+        Self {
+            decision,
+            reason,
+            approval_profile_ids: Vec::new(),
+        }
     }
 
     fn deny(reason: ReasonCode) -> Self {
@@ -138,11 +142,19 @@ pub fn evaluate(bundle: &PolicyBundle, request: &PolicyRequest<'_>) -> DecisionR
                 || rule.actions.is_empty()
                 || rule.actions.iter().any(|action| action.trim().is_empty())
                 || rule.subjects.iter().any(|subject| match subject {
-                    SubjectSelector::Principal(id) | SubjectSelector::Agent(id) => id.trim().is_empty(),
+                    SubjectSelector::Principal(id) | SubjectSelector::Agent(id) => {
+                        id.trim().is_empty()
+                    }
                 })
-                || rule.resources.iter().any(|resource| resource.trim().is_empty())
+                || rule
+                    .resources
+                    .iter()
+                    .any(|resource| resource.trim().is_empty())
                 || match rule.effect {
-                    RuleEffect::RequireApproval => rule.approval_profile_id.as_ref().is_none_or(|id| id.trim().is_empty()),
+                    RuleEffect::RequireApproval => rule
+                        .approval_profile_id
+                        .as_ref()
+                        .is_none_or(|id| id.trim().is_empty()),
                     RuleEffect::Allow | RuleEffect::Deny => rule.approval_profile_id.is_some(),
                 }
         })
@@ -151,7 +163,11 @@ pub fn evaluate(bundle: &PolicyBundle, request: &PolicyRequest<'_>) -> DecisionR
     }
 
     let mut rule_ids = BTreeSet::new();
-    if bundle.rules.iter().any(|rule| !rule_ids.insert(rule.rule_id.as_str())) {
+    if bundle
+        .rules
+        .iter()
+        .any(|rule| !rule_ids.insert(rule.rule_id.as_str()))
+    {
         return DecisionResult::deny(ReasonCode::PolicyInvalid);
     }
 
@@ -193,13 +209,22 @@ fn rule_matches(rule: &PolicyRule, request: &PolicyRequest<'_>) -> bool {
             SubjectSelector::Principal(id) => id == request.principal_id,
             SubjectSelector::Agent(id) => id == request.agent_id,
         });
-    let action_matches = rule.actions.iter().any(|action| action == request.action_type);
+    let action_matches = rule
+        .actions
+        .iter()
+        .any(|action| action == request.action_type);
     let resource_matches = rule.resources.is_empty()
-        || rule.resources.iter().any(|resource| resource == request.resource);
+        || rule
+            .resources
+            .iter()
+            .any(|resource| resource == request.resource);
     subject_matches
         && action_matches
         && resource_matches
-        && rule.conditions.iter().all(|condition| condition_matches(condition, request.context))
+        && rule
+            .conditions
+            .iter()
+            .all(|condition| condition_matches(condition, request.context))
 }
 
 fn condition_matches(condition: &Condition, context: &BTreeMap<String, Value>) -> bool {
@@ -213,9 +238,15 @@ fn condition_matches(condition: &Condition, context: &BTreeMap<String, Value>) -
         Operator::Neq => actual.is_some_and(|value| value != &condition.expected),
         Operator::In | Operator::NotIn => {
             let Some(actual) = actual else { return false };
-            let Value::Set(values) = &condition.expected else { return false };
+            let Value::Set(values) = &condition.expected else {
+                return false;
+            };
             let contains = values.iter().any(|value| value == actual);
-            if condition.operator == Operator::In { contains } else { !contains }
+            if condition.operator == Operator::In {
+                contains
+            } else {
+                !contains
+            }
         }
         Operator::Gt | Operator::Gte | Operator::Lt | Operator::Lte => {
             let Some(actual) = actual else { return false };
@@ -252,7 +283,8 @@ mod tests {
             actions: vec!["wallet.transfer".into()],
             resources: vec![],
             conditions: vec![],
-            approval_profile_id: (effect == RuleEffect::RequireApproval).then(|| "finance-2p".into()),
+            approval_profile_id: (effect == RuleEffect::RequireApproval)
+                .then(|| "finance-2p".into()),
         }
     }
 
@@ -278,8 +310,18 @@ mod tests {
     #[test]
     fn allow_requires_matching_allow_rule() {
         let context = BTreeMap::new();
-        assert_eq!(evaluate(&bundle(vec![rule("a", RuleEffect::Allow)]), &request(&context)).decision, Decision::Allow);
-        assert_eq!(evaluate(&bundle(vec![]), &request(&context)).reason, ReasonCode::NoMatchingAllowRule);
+        assert_eq!(
+            evaluate(
+                &bundle(vec![rule("a", RuleEffect::Allow)]),
+                &request(&context)
+            )
+            .decision,
+            Decision::Allow
+        );
+        assert_eq!(
+            evaluate(&bundle(vec![]), &request(&context)).reason,
+            ReasonCode::NoMatchingAllowRule
+        );
     }
 
     #[test]
@@ -287,7 +329,10 @@ mod tests {
         let context = BTreeMap::new();
         let allow = rule("allow", RuleEffect::Allow);
         let deny = rule("deny", RuleEffect::Deny);
-        let first = evaluate(&bundle(vec![allow.clone(), deny.clone()]), &request(&context));
+        let first = evaluate(
+            &bundle(vec![allow.clone(), deny.clone()]),
+            &request(&context),
+        );
         let second = evaluate(&bundle(vec![deny, allow]), &request(&context));
         assert_eq!(first, second);
         assert_eq!(first.decision, Decision::Deny);
@@ -301,7 +346,10 @@ mod tests {
         second.approval_profile_id = Some("z-profile".into());
         let mut first = rule("approval-1", RuleEffect::RequireApproval);
         first.approval_profile_id = Some("a-profile".into());
-        let result = evaluate(&bundle(vec![rule("allow", RuleEffect::Allow), second, first]), &request(&context));
+        let result = evaluate(
+            &bundle(vec![rule("allow", RuleEffect::Allow), second, first]),
+            &request(&context),
+        );
         assert_eq!(result.decision, Decision::RequireApproval);
         assert_eq!(result.approval_profile_ids, vec!["a-profile", "z-profile"]);
     }
@@ -311,8 +359,21 @@ mod tests {
         let context = BTreeMap::new();
         let mut unknown = bundle(vec![rule("a", RuleEffect::Allow)]);
         unknown.schema_version = "future".into();
-        assert_eq!(evaluate(&unknown, &request(&context)).reason, ReasonCode::PolicySchemaUnsupported);
-        assert_eq!(evaluate(&bundle(vec![rule("a", RuleEffect::Allow), rule("a", RuleEffect::Deny)]), &request(&context)).reason, ReasonCode::PolicyInvalid);
+        assert_eq!(
+            evaluate(&unknown, &request(&context)).reason,
+            ReasonCode::PolicySchemaUnsupported
+        );
+        assert_eq!(
+            evaluate(
+                &bundle(vec![
+                    rule("a", RuleEffect::Allow),
+                    rule("a", RuleEffect::Deny)
+                ]),
+                &request(&context)
+            )
+            .reason,
+            ReasonCode::PolicyInvalid
+        );
     }
 
     #[test]
@@ -327,9 +388,15 @@ mod tests {
             operator: Operator::Lte,
             expected: Value::Integer(1_000),
         }];
-        assert_eq!(evaluate(&bundle(vec![policy_rule]), &request(&context)).decision, Decision::Allow);
+        assert_eq!(
+            evaluate(&bundle(vec![policy_rule]), &request(&context)).decision,
+            Decision::Allow
+        );
         context.insert("amount_minor".into(), Value::String("500".into()));
-        assert_eq!(evaluate(&bundle(vec![rule_with_condition()]), &request(&context)).decision, Decision::Deny);
+        assert_eq!(
+            evaluate(&bundle(vec![rule_with_condition()]), &request(&context)).decision,
+            Decision::Deny
+        );
     }
 
     fn rule_with_condition() -> PolicyRule {
