@@ -1,0 +1,106 @@
+{
+  "schema_version": "agentguard.canonicalization-v1",
+  "profile": "agentguard-jcs-constrained-v1",
+  "vectors": [
+    {
+      "id": "empty-object",
+      "input_json": "{}",
+      "expected_canonical_json_utf8": "{}"
+    },
+    {
+      "id": "empty-array",
+      "input_json": "[]",
+      "expected_canonical_json_utf8": "[]"
+    },
+    {
+      "id": "nested-sort-and-array-order",
+      "input_json": " { \"z\": [ {\"b\":2,\"a\":1}, 3 ], \"a\": true } ",
+      "expected_canonical_json_utf8": "{\"a\":true,\"z\":[{\"a\":1,\"b\":2},3]}"
+    },
+    {
+      "id": "utf16-non-bmp-key-order",
+      "input_json": "{\"\\uE000\":1,\"\\uD800\\uDC00\":2}",
+      "expected_canonical_json_utf8": "{\"𐀀\":2,\"\":1}"
+    },
+    {
+      "id": "string-escaping",
+      "input_json": "{\"s\":\"quote:\\\" slash:/ backslash:\\\\ newline:\\n tab:\\t nul:\\u0000\"}",
+      "expected_canonical_json_utf8": "{\"s\":\"quote:\\\" slash:/ backslash:\\\\ newline:\\n tab:\\t nul:\\u0000\"}"
+    },
+    {
+      "id": "unicode-no-normalization-composed",
+      "input_json": "{\"s\":\"é\"}",
+      "expected_canonical_json_utf8": "{\"s\":\"é\"}"
+    },
+    {
+      "id": "unicode-no-normalization-decomposed",
+      "input_json": "{\"s\":\"é\"}",
+      "expected_canonical_json_utf8": "{\"s\":\"é\"}"
+    },
+    {
+      "id": "safe-integer-max",
+      "input_json": "9007199254740991",
+      "expected_canonical_json_utf8": "9007199254740991"
+    },
+    {
+      "id": "safe-integer-min",
+      "input_json": "-9007199254740991",
+      "expected_canonical_json_utf8": "-9007199254740991"
+    },
+    {
+      "id": "negative-zero-decimal",
+      "input_json": "-0.0",
+      "expected_canonical_json_utf8": "0"
+    },
+    {
+      "id": "duplicate-root",
+      "input_json": "{\"a\":1,\"a\":2}",
+      "expected_error": "DuplicateKey"
+    },
+    {
+      "id": "duplicate-nested",
+      "input_json": "{\"outer\":{\"a\":1,\"a\":2}}",
+      "expected_error": "DuplicateKey"
+    },
+    {
+      "id": "duplicate-escaped-equivalent",
+      "input_json": "{\"a\":1,\"\\u0061\":2}",
+      "expected_error": "DuplicateKey"
+    },
+    {
+      "id": "fraction-rejected",
+      "input_json": "1.0",
+      "expected_error": "FloatNotAllowed"
+    },
+    {
+      "id": "exponent-positive-zero-rejected",
+      "input_json": "0e0",
+      "expected_error": "FloatNotAllowed"
+    },
+    {
+      "id": "unsafe-integer-positive",
+      "input_json": "9007199254740992",
+      "expected_error": "UnsafeInteger"
+    },
+    {
+      "id": "unsafe-integer-negative",
+      "input_json": "-9007199254740992",
+      "expected_error": "UnsafeInteger"
+    },
+    {
+      "id": "malformed-json",
+      "input_json": "{\"a\":",
+      "expected_error": "InvalidJson"
+    },
+    {
+      "id": "lone-high-surrogate",
+      "input_json": "\"\\ud800\"",
+      "expected_error": "InvalidJson"
+    },
+    {
+      "id": "lone-low-surrogate",
+      "input_json": "\"\\udfff\"",
+      "expected_error": "InvalidJson"
+    }
+  ]
+}
