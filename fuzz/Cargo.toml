@@ -1,0 +1,11 @@
+[package]
+name = "agentguard-canonical-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[workspace]
+
+[dependencies]
+agentguard-canonical = { path = "../crates/agentguard-canonical" }
+libfuzzer-sys = "0.4"
