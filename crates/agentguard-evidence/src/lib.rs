@@ -187,6 +187,12 @@ pub struct DurableCommitRef {
     pub commit_id: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StoredEvidenceEvent {
+    pub event: EvidenceEventV1,
+    pub commit: DurableCommitRef,
+}
+
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
 pub enum EvidenceStoreError {
     #[error("stream head conflict")]
