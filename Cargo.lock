@@ -39,6 +39,9 @@ name = "agentguard-policy"
 version = "0.1.0"
 dependencies = [
  "agentguard-core",
+ "serde",
+ "serde_json",
+ "thiserror",
 ]
 
 [[package]]
