@@ -1,0 +1,40 @@
+name: Canonicalization Fuzz
+
+on:
+  push:
+    branches: ['feat/**', 'fix/**']
+    paths:
+      - 'crates/agentguard-canonical/**'
+      - 'fuzz/**'
+      - '.github/workflows/canonical-fuzz.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'crates/agentguard-canonical/**'
+      - 'fuzz/**'
+      - '.github/workflows/canonical-fuzz.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: canonical-fuzz-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fuzz-canonical-json:
+    name: 5-minute canonical JSON fuzz campaign
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install nightly Rust with sanitizer support
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: llvm-tools-preview
+      - name: Install cargo-fuzz
+        run: cargo install cargo-fuzz --locked
+      - name: Run bounded fuzz campaign
+        working-directory: fuzz
+        run: cargo +nightly fuzz run canonicalize_json -- -max_total_time=300
