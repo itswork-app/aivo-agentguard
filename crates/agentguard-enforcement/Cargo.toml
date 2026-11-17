@@ -8,6 +8,7 @@ repository.workspace = true
 
 [dependencies]
 agentguard-core = { path = "../agentguard-core" }
+agentguard-evidence = { path = "../agentguard-evidence" }
 serde = { version = "1", features = ["derive"] }
 thiserror = "2"
 
