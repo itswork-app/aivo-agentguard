@@ -176,14 +176,13 @@ pub trait IdentifiedEvidenceReceiptSigner: EvidenceReceiptSigner {
     fn key_id(&self) -> &str;
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use agentguard_core::{SignatureAlgorithm, SignatureEnvelope, canonical_json};
     use agentguard_evidence::{
-        DurableCommitRef, EvidenceEventV1, EvidenceSignerError,
-        EvidenceStoreError, EvidenceStreamHead, StoredEvidenceEvent,
+        DurableCommitRef, EvidenceEventV1, EvidenceSignerError, EvidenceStoreError,
+        EvidenceStreamHead, StoredEvidenceEvent,
     };
     use agentguard_policy::{
         PolicyKeyError, PolicyRuleV1, ResourceSelectorV1, RuleEffect, SubjectSelectorV1,
@@ -357,9 +356,9 @@ mod tests {
 
         assert!(matches!(
             result,
-            Err(RuntimeError::Evidence(agentguard_evidence::EvidenceError::Store(
-                EvidenceStoreError::Unavailable
-            )))
+            Err(RuntimeError::Evidence(
+                agentguard_evidence::EvidenceError::Store(EvidenceStoreError::Unavailable)
+            ))
         ));
         assert!(!signer.called.load(Ordering::SeqCst));
     }
