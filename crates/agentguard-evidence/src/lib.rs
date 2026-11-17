@@ -162,11 +162,17 @@ impl EvidenceEventV1 {
         }
     }
 
+    ///
+    /// # Errors
+    /// Returns an error if canonical event serialization fails.
     pub fn recompute_hash(&self) -> Result<String, EvidenceError> {
         let bytes = canonical_json(&self.hash_payload())?;
         Ok(hex_digest(&domain_digest(EVENT_HASH_DOMAIN, &bytes)))
     }
 
+    ///
+    /// # Errors
+    /// Returns an error if event fields or the computed hash are invalid.
     pub fn verify_integrity(&self) -> Result<(), EvidenceError> {
         validate_event(self)?;
         if self.recompute_hash()? != self.event_hash {
