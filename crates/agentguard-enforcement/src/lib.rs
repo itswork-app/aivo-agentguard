@@ -10,6 +10,7 @@ use agentguard_core::{
     RevocationPersistenceError, RevocationStatus, RevocationSubjectType,
     SignedRevocationSnapshotV1, persist_verified_snapshot,
 };
+use agentguard_evidence::{EvidenceEventType, EvidenceStore, SignedEvidenceReceiptV1, verify_receipt_read_back};
 use serde::{Deserialize, Serialize};
 
 /// Public key material resolved for one exact key ID and cryptographic purpose.
@@ -190,6 +191,10 @@ pub enum EnforcementError {
     ResolvedKeyMismatch,
     #[error("permit does not match the independently derived execution context")]
     ExecutionContextMismatch,
+    #[error("evidence receipt verification failed: {0}")]
+    Evidence(String),
+    #[error("evidence receipt does not bind the authorization attestation")]
+    EvidenceBindingMismatch,
 }
 
 /// Verify all G3 signatures, fresh revocation status, bindings, and expiry,
@@ -206,7 +211,7 @@ pub enum EnforcementError {
 /// Returns an error for any missing/untrusted key, invalid signature, stale or
 /// rolled-back revocation snapshot, non-ACTIVE required subject, invalid time,
 /// envelope mismatch, or permit replay/store failure.
-pub fn verify_and_consume<K, C, R, H, P>(
+pub fn verify_and_consume<K, C, R, H, P, E>(
     envelope: &PermitEnvelopeV2,
     expected: &ExpectedExecutionContextV1,
     keys: &K,
@@ -214,6 +219,8 @@ pub fn verify_and_consume<K, C, R, H, P>(
     revocation_source: &R,
     high_water_store: &H,
     permit_store: &P,
+    evidence_store: &E,
+    evidence_receipt: &SignedEvidenceReceiptV1,
 ) -> Result<ConsumedPermitV2, EnforcementError>
 where
     K: VerificationKeyResolver,
@@ -221,6 +228,7 @@ where
     R: RevocationSnapshotSource,
     H: RevocationHighWaterMarkStore,
     P: PermitConsumptionStore,
+    E: EvidenceStore,
 {
     let now_utc = clock.now_utc()?;
     envelope.validate_at(&now_utc)?;
@@ -230,6 +238,7 @@ where
     let snapshot = verify_current_revocation(keys, revocation_source, high_water_store, &now_utc)?;
 
     require_envelope_subjects_active(envelope, &snapshot)?;
+    verify_attestation_evidence(envelope, evidence_receipt, evidence_store, keys, &snapshot)?;
     envelope.verify_all_signatures(
         &verification_keys.permit.public_key,
         &verification_keys.challenge.public_key,
@@ -367,6 +376,64 @@ fn require_envelope_subjects_active(
         ),
     ] {
         require_active(snapshot, subject_type, subject_id)?;
+    }
+    Ok(())
+}
+
+fn verify_attestation_evidence<K, E>(
+    envelope: &PermitEnvelopeV2,
+    receipt: &SignedEvidenceReceiptV1,
+    store: &E,
+    keys: &K,
+    snapshot: &SignedRevocationSnapshotV1,
+) -> Result<(), EnforcementError>
+where
+    K: VerificationKeyResolver,
+    E: EvidenceStore,
+{
+    let attestation = &envelope.authorization_attestation_v1.claims;
+    let claims = &receipt.claims;
+    let receipt_digest = agentguard_core::hex_digest(
+        &receipt.digest().map_err(|error| EnforcementError::Evidence(error.to_string()))?,
+    );
+    if claims.receipt_id != attestation.evidence_receipt_ref.receipt_id
+        || receipt_digest != attestation.evidence_receipt_ref.receipt_digest
+        || claims.tenant_id != attestation.tenant_id
+        || claims.stream_id != attestation.decision_event_ref.stream_id
+        || claims.sequence != attestation.decision_event_ref.sequence
+        || claims.event_hash != attestation.decision_event_ref.event_hash
+        || claims.event_type != EvidenceEventType::DecisionRecorded.as_str()
+        || claims.request_digest != attestation.request_digest
+        || claims.action_digest != attestation.action_digest
+        || claims.policy_digest != attestation.policy_digest
+        || claims.context_digest != attestation.context_digest
+        || attestation.decision_event_ref.tenant_id != attestation.tenant_id
+    {
+        return Err(EnforcementError::EvidenceBindingMismatch);
+    }
+
+    let key = resolve_key(keys, &claims.evidence_key_id, KeyPurpose::EvidenceService)?;
+    require_active(snapshot, RevocationSubjectType::EvidenceServiceKey, &claims.evidence_key_id)?;
+    let event = verify_receipt_read_back(
+        store,
+        receipt,
+        &key.public_key,
+        &claims.evidence_key_id,
+    ).map_err(|error| EnforcementError::Evidence(error.to_string()))?;
+
+    if event.tenant_id != attestation.tenant_id
+        || event.stream_id != attestation.decision_event_ref.stream_id
+        || event.sequence != attestation.decision_event_ref.sequence
+        || event.event_hash != attestation.decision_event_ref.event_hash
+        || event.event_type != EvidenceEventType::DecisionRecorded
+        || event.request_id != attestation.request_id
+        || event.request_digest.as_deref() != Some(attestation.request_digest.as_str())
+        || event.action_digest.as_deref() != Some(attestation.action_digest.as_str())
+        || event.policy_digest.as_deref() != Some(attestation.policy_digest.as_str())
+        || event.context_digest.as_deref() != Some(attestation.context_digest.as_str())
+        || event.decision.as_deref() != Some("ALLOW")
+    {
+        return Err(EnforcementError::EvidenceBindingMismatch);
     }
     Ok(())
 }
