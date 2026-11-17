@@ -153,7 +153,6 @@ pub enum TrustClass {
 pub struct ConditionV1 {
     pub field_id: String,
     pub operator: ConditionOperator,
-    #[serde(default)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub value: Option<Value>,
     #[serde(default)]
