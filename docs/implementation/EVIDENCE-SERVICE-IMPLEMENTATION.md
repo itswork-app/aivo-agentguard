@@ -46,6 +46,8 @@ A failed step returns an error and must never be treated as an authorization per
 - The enforcement API groups injected dependencies in `EnforcementServices`; no key or storage implementation is embedded in the verifier.
 - Before atomic permit consumption, enforcement checks that the receipt digest/ID and event tenant, stream, sequence, hash, type, request/action/policy/context digests, request ID, and `ALLOW` decision exactly match the signed authorization attestation.
 
+- Enforcement performs a second trusted-time read and signed-revocation snapshot verification after evidence read-back and immediately before atomic permit consumption. The refreshed snapshot must still mark every required permit, challenge, envelope, attestation, policy, and evidence-service key/identity ACTIVE; the envelope is revalidated against the refreshed time. This narrows the revocation/expiry check-to-consume window but does not make an external side effect atomic with revocation.
+
 ## Explicit non-claims
 
 This crate does not provide a production database, a signing service, rollback-resistant storage, independent checkpoint anchoring, external audit, or certification. The interface contracts are not evidence that a concrete adapter satisfies them. Hash chaining does not prove source truth, event completeness before ingestion, or that an external action occurred.
