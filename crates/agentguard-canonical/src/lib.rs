@@ -229,10 +229,7 @@ pub fn canonicalize_json(input: &[u8]) -> Result<Vec<u8>, CanonicalError> {
 }
 
 /// Computes a raw 32-byte SHA-256 digest over domain separator + canonical JSON.
-pub fn digest_json(
-    domain: DigestDomain,
-    input: &[u8],
-) -> Result<[u8; 32], CanonicalError> {
+pub fn digest_json(domain: DigestDomain, input: &[u8]) -> Result<[u8; 32], CanonicalError> {
     let canonical = canonicalize_json(input)?;
     let mut hasher = Sha256::new();
     hasher.update(domain.separator());
@@ -241,10 +238,7 @@ pub fn digest_json(
 }
 
 /// Computes a lowercase 64-character hexadecimal domain-separated digest.
-pub fn digest_hex(
-    domain: DigestDomain,
-    input: &[u8],
-) -> Result<String, CanonicalError> {
+pub fn digest_hex(domain: DigestDomain, input: &[u8]) -> Result<String, CanonicalError> {
     let digest = digest_json(domain, input)?;
     let mut output = String::with_capacity(64);
     for byte in digest {
