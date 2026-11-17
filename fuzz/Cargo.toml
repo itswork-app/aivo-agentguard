@@ -9,3 +9,10 @@ edition = "2021"
 [dependencies]
 agentguard-canonical = { path = "../crates/agentguard-canonical" }
 libfuzzer-sys = "0.4"
+
+[[bin]]
+name = "canonicalize_json"
+path = "fuzz_targets/canonicalize_json.rs"
+test = false
+doc = false
+bench = false
