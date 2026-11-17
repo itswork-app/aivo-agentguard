@@ -2,8 +2,7 @@
 
 **Status:** Approved and frozen — Product Owner approval recorded 2026-11-17  
 **Version:** 0.1.0  
-**Parent baselines:** G1 v0.1.0 and G2 v0.1.0  
-**Branch:** `feat/g3-authorization-proof-permit-binding`
+**Parent baselines:** G1 v0.1.0 and G2 v0.1.0
 
 ## 1. Objective
 
@@ -33,7 +32,7 @@ G3 is a protocol/specification gate. It does not implement runtime signing, enfo
 6. Revocation snapshots are signed by a separate revocation authority, monotonic, rollback-resistant, and bounded to 30-second maximum age with 60-second maximum snapshot validity.
 7. Required revocation status is checked at signing and immediately before permit consumption; unknown, stale, unavailable, revoked, compromised, or rolled-back status fails closed.
 8. No G3 profile accepts legacy G1 permits without the v2 envelope.
-9. All verification checks precede atomic tenant-scoped permit consumption; consumption precedes side effects.
+9. All verification checks precede atomic tenant-scoped permit consumption; consumption precedes side effects, as specified by ADR-0007.
 
 ## 4. Specification set
 
@@ -43,12 +42,15 @@ G3 is a protocol/specification gate. It does not implement runtime signing, enfo
 - `testing/G3-ACCEPTANCE-TEST-PLAN.md`
 - `testing/G3-TRACEABILITY.md`
 - `security/G3-ADVERSARIAL-REVIEW.md`
+- ADR-0007: atomic tenant-scoped single-use permit consumption.
 - ADR-0008: authorization attestation and verifier isolation.
 - ADR-0009: permit envelope v2 and revocation status.
 
-## 5. Adversarial review
+## 5. Adversarial review and approval boundary
 
-The current AI-assisted specification review is recorded in `security/G3-ADVERSARIAL-REVIEW.md`. It is a conditional pass for continued Draft review only, not Product Owner approval, third-party audit, implementation approval, or production authorization. Its limitations and unresolved questions remain binding.
+The review recorded in `security/G3-ADVERSARIAL-REVIEW.md` is an AI-assisted adversarial design review with the status **conditional pass for specification baseline freeze**. It is not a third-party audit, cryptographic implementation audit, penetration test, certification, or evidence that the G3 protocol has been implemented or executed.
+
+Separately, the Product Owner approved the G3 protocol/specification baseline and the five product decisions on 2026-11-17. This approval freezes the documented design choices; it does not convert the conditional review into an unconditional security pass, waive the review's limitations, authorize production enforcement, or claim implementation readiness.
 
 ## 6. Approved product decisions
 
@@ -56,12 +58,14 @@ All five G3 open decisions are approved and recorded in `governance/G3-OPEN-DECI
 
 Implementation details and operational evidence remain release gates; they are not represented as already implemented.
 
-## 7. Exit criteria
+## 7. Exit criteria and implementation gates
 
 - Product Owner approval of the G3 protocol baseline and all five open decisions is recorded.
-- ADRs accepted and cross-document consistency verified.
-- Golden vectors and implementation-level test fixtures defined.
+- ADR-0007, ADR-0008, and ADR-0009 are accepted and their normative relationships are consistent across the specification set.
+- Golden vectors and implementation-level test fixtures are defined; their definition is not evidence that runtime tests have passed.
 - Rust implementation maps every MUST to a typed API and test.
 - G3 implementation tests pass before production enablement.
-- No unresolved Critical/High security findings.
-- External adapter and operational review remains required before production use.
+- No unresolved Critical/High security findings remain after implementation-level review.
+- External independent security review, adapter-specific assessment, and operational review remain required before production use.
+
+**Current implementation status:** G3 is an approved specification baseline. Runtime signing, independent attestation, revocation enforcement, durable evidence receipt verification, trusted-time integration, and atomic permit consumption are not declared implemented by this document. No CI or implementation test result is implied by Product Owner approval.
