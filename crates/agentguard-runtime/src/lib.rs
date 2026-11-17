@@ -65,8 +65,6 @@ pub enum RuntimeError {
     Clock(#[from] RuntimeClockError),
     #[error("durable decision evidence failed: {0}")]
     Evidence(#[from] agentguard_evidence::EvidenceError),
-    #[error("evidence metadata tenant does not match the evaluated request")]
-    TenantMismatch,
 }
 
 /// Evaluate a signed policy, then durably append and read back its decision
@@ -118,10 +116,6 @@ where
             agentguard_evidence::EvidenceError::InvalidReceipt,
         ));
     }
-    if evidence.request_id.is_empty() || request.tenant_id.is_empty() {
-        return Err(RuntimeError::TenantMismatch);
-    }
-
     let result = evaluate(bundle, request, keys)?;
     let timestamp = clock.now_utc()?;
 
