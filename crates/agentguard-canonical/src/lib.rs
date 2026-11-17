@@ -469,6 +469,72 @@ mod tests {
     }
 
     #[test]
+    fn canonicalization_conformance_corpus_matches_exact_bytes_and_errors() {
+        let fixture = include_str!("../tests/vectors/canonicalization-v1.json");
+        let corpus: serde_json::Value = serde_json::from_str(fixture).unwrap();
+        assert_eq!(
+            corpus["schema_version"].as_str(),
+            Some("agentguard.canonicalization-v1")
+        );
+        assert_eq!(
+            corpus["profile"].as_str(),
+            Some("agentguard-jcs-constrained-v1")
+        );
+
+        for vector in corpus["vectors"].as_array().unwrap() {
+            let id = vector["id"].as_str().unwrap();
+            let input = vector["input_json"].as_str().unwrap().as_bytes();
+            if let Some(expected) = vector.get("expected_canonical_json_utf8") {
+                assert_eq!(
+                    canonicalize_json(input).unwrap(),
+                    expected.as_str().unwrap().as_bytes(),
+                    "canonical bytes for {id}"
+                );
+            } else {
+                let expected_error = match vector["expected_error"].as_str().unwrap() {
+                    "DuplicateKey" => CanonicalError::DuplicateKey,
+                    "FloatNotAllowed" => CanonicalError::FloatNotAllowed,
+                    "UnsafeInteger" => CanonicalError::UnsafeInteger,
+                    "InvalidJson" => CanonicalError::InvalidJson,
+                    other => panic!("unknown canonical error in vector {id}: {other}"),
+                };
+                assert_eq!(
+                    canonicalize_json(input),
+                    Err(expected_error),
+                    "stable error for {id}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn canonicalization_properties_hold_for_generated_inputs() {
+        for left in 0_u64..32 {
+            for right in 0_u64..32 {
+                let forward = format!(r#"{{"left":{left},"right":{right}}}"#);
+                let reverse = format!(r#"{{"right":{right},"left":{left}}}"#);
+                let canonical = canonicalize_json(forward.as_bytes()).unwrap();
+                let reordered = canonicalize_json(reverse.as_bytes()).unwrap();
+
+                // Object insertion order is irrelevant and canonicalization is idempotent.
+                assert_eq!(canonical, reordered);
+                assert_eq!(canonicalize_json(&canonical).unwrap(), canonical);
+
+                // Array order is significant and must not be sorted.
+                let array_forward = format!("[{left},{right}]");
+                let array_reverse = format!("[{right},{left}]");
+                let canonical_array_forward =
+                    canonicalize_json(array_forward.as_bytes()).unwrap();
+                let canonical_array_reverse =
+                    canonicalize_json(array_reverse.as_bytes()).unwrap();
+                if left != right {
+                    assert_ne!(canonical_array_forward, canonical_array_reverse);
+                }
+            }
+        }
+    }
+
+    #[test]
     fn digest_is_bound_to_domain_and_nul_terminated_separator() {
         let request = digest_json(DigestDomain::Request, br#"{"a":1}"#).unwrap();
         let action = digest_json(DigestDomain::Action, br#"{"a":1}"#).unwrap();
