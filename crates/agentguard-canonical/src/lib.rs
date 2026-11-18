@@ -292,7 +292,7 @@ pub fn canonicalize_json(input: &[u8]) -> Result<Vec<u8>, CanonicalError> {
         return Err(CanonicalError::UnsafeInteger);
     }
 
-    let value = serde_json::from_slice::<StrictValue>(input).map_err(classify_json_error)?;
+    let value = serde_json::from_slice::<StrictValue>(input).map_err(|error| classify_json_error(&error))?;
 
     let mut output = Vec::with_capacity(input.len());
     write_canonical(&value, &mut output)?;
