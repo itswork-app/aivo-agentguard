@@ -244,7 +244,7 @@ fn exceeds_nesting_limit(input: &[u8]) -> bool {
         if in_string {
             if escaped {
                 escaped = false;
-            } else if *byte == b'\\\\' {
+            } else if *byte == b'\\' {
                 escaped = true;
             } else if *byte == b'"' {
                 in_string = false;
