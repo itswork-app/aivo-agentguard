@@ -14,6 +14,7 @@ pub const MAX_CANONICAL_INPUT_BYTES: usize = 1_048_576;
 
 /// Maximum absolute integer value accepted by the `AgentGuard` v1 profile.
 pub const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
+const MAX_SAFE_INTEGER_DECIMAL: &[u8] = b"9007199254740991";
 
 /// Stable, non-sensitive canonicalization failure categories.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -253,9 +254,9 @@ fn contains_unsafe_integer_token(input: &[u8]) -> bool {
                 let token = &input[start..index];
                 if !token.iter().any(|byte| matches!(byte, b'.' | b'e' | b'E')) {
                     let digits = token.strip_prefix(b"-").unwrap_or(token);
-                    let maximum = MAX_SAFE_INTEGER.to_string();
-                    if digits.len() > maximum.len()
-                        || (digits.len() == maximum.len() && digits > maximum.as_bytes())
+                    if digits.len() > MAX_SAFE_INTEGER_DECIMAL.len()
+                        || (digits.len() == MAX_SAFE_INTEGER_DECIMAL.len()
+                            && digits > MAX_SAFE_INTEGER_DECIMAL)
                     {
                         return true;
                     }
