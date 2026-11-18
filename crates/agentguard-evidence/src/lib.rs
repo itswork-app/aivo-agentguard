@@ -1299,7 +1299,10 @@ mod tests {
             stream_id: &str,
             sequence: u64,
         ) -> Result<Option<StoredEvidenceEvent>, EvidenceStoreError> {
-            let streams = self.streams.lock().map_err(|_| EvidenceStoreError::Unavailable)?;
+            let streams = self
+                .streams
+                .lock()
+                .map_err(|_| EvidenceStoreError::Unavailable)?;
             Ok(streams
                 .get(&(tenant_id.to_owned(), stream_id.to_owned()))
                 .and_then(|events| {
