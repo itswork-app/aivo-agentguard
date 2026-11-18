@@ -989,6 +989,15 @@ fn domain_message(domain: &[u8], payload: &[u8]) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+    use ed25519_dalek::{Signer, SigningKey};
+    use std::{
+        collections::BTreeMap,
+        sync::{
+            Mutex,
+            atomic::{AtomicBool, Ordering},
+        },
+    };
 
     fn draft(sequence: u64, event_id: &str) -> EvidenceEventDraftV1 {
         EvidenceEventDraftV1 {
@@ -1219,4 +1228,224 @@ mod tests {
             .is_err()
         );
     }
+    #[derive(Default)]
+    struct MemoryEvidenceStore {
+        streams: Mutex<BTreeMap<(String, String), Vec<StoredEvidenceEvent>>>,
+        conflict_once: AtomicBool,
+    }
+
+    impl EvidenceStore for MemoryEvidenceStore {
+        fn read_head(
+            &self,
+            tenant_id: &str,
+            stream_id: &str,
+        ) -> Result<Option<EvidenceStreamHead>, EvidenceStoreError> {
+            let streams = self.streams.lock().map_err(|_| EvidenceStoreError::Unavailable)?;
+            Ok(streams
+                .get(&(tenant_id.to_owned(), stream_id.to_owned()))
+                .and_then(|events| events.last())
+                .map(|stored| EvidenceStreamHead {
+                    sequence: stored.event.sequence,
+                    event_hash: stored.event.event_hash.clone(),
+                }))
+        }
+
+        fn append_if_head_matches(
+            &self,
+            event: &EvidenceEventV1,
+            expected: Option<&EvidenceStreamHead>,
+        ) -> Result<DurableCommitRef, EvidenceStoreError> {
+            if self.conflict_once.swap(false, Ordering::SeqCst) {
+                return Err(EvidenceStoreError::HeadConflict);
+            }
+            verify_event(event).map_err(|_| EvidenceStoreError::Rejected)?;
+            let mut streams = self.streams.lock().map_err(|_| EvidenceStoreError::Unavailable)?;
+            let key = (event.tenant_id.clone(), event.stream_id.clone());
+            let events = streams.entry(key).or_default();
+            let actual = events.last().map(|stored| EvidenceStreamHead {
+                sequence: stored.event.sequence,
+                event_hash: stored.event.event_hash.clone(),
+            });
+            if actual.as_ref() != expected {
+                return Err(EvidenceStoreError::HeadConflict);
+            }
+            let expected_sequence = actual.map_or(1, |head| head.sequence + 1);
+            if event.sequence != expected_sequence
+                || events.iter().any(|stored| stored.event.event_id == event.event_id)
+            {
+                return Err(EvidenceStoreError::Duplicate);
+            }
+            let commit = DurableCommitRef {
+                commit_id: format!("commit-{}", event.sequence),
+            };
+            events.push(StoredEvidenceEvent {
+                event: event.clone(),
+                commit: commit.clone(),
+            });
+            Ok(commit)
+        }
+
+        fn read_event(
+            &self,
+            tenant_id: &str,
+            stream_id: &str,
+            sequence: u64,
+        ) -> Result<Option<StoredEvidenceEvent>, EvidenceStoreError> {
+            let streams = self.streams.lock().map_err(|_| EvidenceStoreError::Unavailable)?;
+            Ok(streams
+                .get(&(tenant_id.to_owned(), stream_id.to_owned()))
+                .and_then(|events| events.iter().find(|stored| stored.event.sequence == sequence))
+                .cloned())
+        }
+    }
+
+    struct TestReceiptSigner {
+        signing_key: SigningKey,
+        key_id: String,
+    }
+
+    impl EvidenceReceiptSigner for TestReceiptSigner {
+        fn sign_receipt(&self, message: &[u8]) -> Result<SignatureEnvelope, EvidenceSignerError> {
+            let signature = self.signing_key.sign(message);
+            Ok(SignatureEnvelope {
+                algorithm: SignatureAlgorithm::Ed25519,
+                key_id: self.key_id.clone(),
+                signature: URL_SAFE_NO_PAD.encode(signature.to_bytes()),
+            })
+        }
+    }
+
+    struct FailingReceiptSigner;
+
+    impl EvidenceReceiptSigner for FailingReceiptSigner {
+        fn sign_receipt(&self, _message: &[u8]) -> Result<SignatureEnvelope, EvidenceSignerError> {
+            Err(EvidenceSignerError::Unavailable)
+        }
+    }
+
+    fn append_request() -> EvidenceAppendRequestV1 {
+        EvidenceAppendRequestV1 {
+            event_id: "decision-event-1".to_owned(),
+            tenant_id: "tenant-1".to_owned(),
+            stream_id: "decision-stream-1".to_owned(),
+            occurred_at: "2026-11-19T00:00:00Z".to_owned(),
+            event_type: EvidenceEventType::DecisionRecorded,
+            request_id: "request-1".to_owned(),
+            actor_ref: ActorRefV1 {
+                kind: "agent".to_owned(),
+                id: "agent-1".to_owned(),
+            },
+            request_digest: Some("a".repeat(64)),
+            action_digest: Some("b".repeat(64)),
+            policy_digest: Some("c".repeat(64)),
+            context_digest: Some("d".repeat(64)),
+            decision: Some(DecisionOutcome::Allow),
+            reason_codes: vec!["ALLOW_RULE_MATCHED".to_owned()],
+            correction_of_event_id: None,
+        }
+    }
+
+    fn test_receipt_signer() -> TestReceiptSigner {
+        TestReceiptSigner {
+            signing_key: SigningKey::from_bytes(&[42_u8; 32]),
+            key_id: "evidence-key-1".to_owned(),
+        }
+    }
+
+    #[test]
+    fn durable_receipt_is_signed_only_after_atomic_append_and_readback() {
+        let store = MemoryEvidenceStore::default();
+        let signer = test_receipt_signer();
+        let public_key = signer.signing_key.verifying_key().to_bytes();
+        let result = append_with_durable_receipt(
+            &store,
+            "tenant-1",
+            &signer,
+            &append_request(),
+            "receipt-1",
+            "2026-11-19T00:00:01Z",
+            "evidence-key-1",
+        )
+        .unwrap();
+
+        assert_eq!(result.event.sequence, 1);
+        assert_eq!(
+            verify_receipt_read_back(&store, &result.receipt, &public_key, "evidence-key-1")
+                .unwrap(),
+            result.event
+        );
+    }
+
+    #[test]
+    fn durable_append_retries_head_conflict_without_duplicate_sequence() {
+        let store = MemoryEvidenceStore::default();
+        store.conflict_once.store(true, Ordering::SeqCst);
+        let signer = test_receipt_signer();
+        let result = append_with_durable_receipt(
+            &store,
+            "tenant-1",
+            &signer,
+            &append_request(),
+            "receipt-1",
+            "2026-11-19T00:00:01Z",
+            "evidence-key-1",
+        )
+        .unwrap();
+
+        assert_eq!(result.event.sequence, 1);
+        assert_eq!(
+            store
+                .read_head("tenant-1", "decision-stream-1")
+                .unwrap()
+                .unwrap()
+                .sequence,
+            1
+        );
+    }
+
+    #[test]
+    fn signer_failure_does_not_rollback_committed_evidence() {
+        let store = MemoryEvidenceStore::default();
+        let result = append_with_durable_receipt(
+            &store,
+            "tenant-1",
+            &FailingReceiptSigner,
+            &append_request(),
+            "receipt-1",
+            "2026-11-19T00:00:01Z",
+            "evidence-key-1",
+        );
+        assert_eq!(result, Err(EvidenceServiceError::Signer));
+        assert_eq!(
+            store
+                .read_head("tenant-1", "decision-stream-1")
+                .unwrap()
+                .unwrap()
+                .sequence,
+            1
+        );
+    }
+
+    #[test]
+    fn receipt_claim_tampering_invalidates_signature() {
+        let store = MemoryEvidenceStore::default();
+        let signer = test_receipt_signer();
+        let public_key = signer.signing_key.verifying_key().to_bytes();
+        let mut result = append_with_durable_receipt(
+            &store,
+            "tenant-1",
+            &signer,
+            &append_request(),
+            "receipt-1",
+            "2026-11-19T00:00:01Z",
+            "evidence-key-1",
+        )
+        .unwrap();
+        result.receipt.claims.action_digest = "e".repeat(64);
+        assert_eq!(
+            verify_receipt_read_back(&store, &result.receipt, &public_key, "evidence-key-1"),
+            Err(EvidenceServiceError::InvalidSignature)
+        );
+    }
+
 }
