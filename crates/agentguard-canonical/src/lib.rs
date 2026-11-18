@@ -243,7 +243,10 @@ fn contains_unsafe_integer_token(input: &[u8]) -> bool {
             b'-' | b'0'..=b'9' => {
                 let start = index;
                 while index < input.len()
-                    && !matches!(input[index], b',' | b']' | b'}' | b' ' | b'\n' | b'\r' | b'\t')
+                    && !matches!(
+                        input[index],
+                        b',' | b']' | b'}' | b' ' | b'\n' | b'\r' | b'\t'
+                    )
                 {
                     index += 1;
                 }
@@ -288,8 +291,7 @@ pub fn canonicalize_json(input: &[u8]) -> Result<Vec<u8>, CanonicalError> {
         return Err(CanonicalError::UnsafeInteger);
     }
 
-    let value =
-        serde_json::from_slice::<StrictValue>(input).map_err(classify_json_error)?;
+    let value = serde_json::from_slice::<StrictValue>(input).map_err(classify_json_error)?;
 
     let mut output = Vec::with_capacity(input.len());
     write_canonical(&value, &mut output)?;
