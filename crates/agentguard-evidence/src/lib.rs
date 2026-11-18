@@ -309,6 +309,11 @@ fn hash_preimage(event: &EvidenceEventV1) -> Result<Vec<u8>, EvidenceError> {
 /// Seals a draft against a predecessor hash. The caller must obtain that hash
 /// from an atomically serialized stream append operation; this function is not
 /// storage or concurrency control.
+///
+/// # Errors
+///
+/// Returns an error when the draft violates the event schema, the predecessor
+/// hash is malformed, serialization fails, or canonical hashing rejects input.
 pub fn seal_event(
     draft: EvidenceEventDraftV1,
     previous_event_hash: &str,
@@ -342,6 +347,11 @@ pub fn seal_event(
 }
 
 /// Verifies a sealed event without trusting its stored hash.
+///
+/// # Errors
+///
+/// Returns an error when event fields or hash encodings are invalid, or when
+/// the recomputed event digest does not match the stored digest.
 pub fn verify_event(event: &EvidenceEventV1) -> Result<(), EvidenceError> {
     let draft = EvidenceEventDraftV1 {
         schema_version: event.schema_version.clone(),
@@ -378,6 +388,11 @@ pub fn verify_event(event: &EvidenceEventV1) -> Result<(), EvidenceError> {
 /// Verifies an ordered complete stream from genesis. It detects mutation,
 /// reordering, middle deletion, duplication, and broken links. Tail truncation
 /// and full rewrite require an independently retained signed checkpoint.
+///
+/// # Errors
+///
+/// Returns an error when sequence continuity, tenant/stream identity,
+/// predecessor linkage, event schema, or event digest verification fails.
 pub fn verify_stream(events: &[EvidenceEventV1]) -> Result<(), EvidenceError> {
     let Some(first) = events.first() else {
         return Ok(());
