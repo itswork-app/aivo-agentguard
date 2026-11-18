@@ -205,7 +205,7 @@ impl<'de> Visitor<'de> for StrictValueVisitor {
     }
 }
 
-fn classify_json_error(error: serde_json::Error) -> CanonicalError {
+fn classify_json_error(error: &serde_json::Error) -> CanonicalError {
     let message = error.to_string();
     if message.contains("duplicate object member") {
         CanonicalError::DuplicateKey
@@ -285,7 +285,7 @@ pub fn canonicalize_json(input: &[u8]) -> Result<Vec<u8>, CanonicalError> {
     let mut syntax = serde_json::Deserializer::from_slice(input);
     IgnoredAny::deserialize(&mut syntax)
         .and_then(|_| syntax.end())
-        .map_err(classify_json_error)?;
+        .map_err(|error| classify_json_error(&error))?;
 
     if contains_unsafe_integer_token(input) {
         return Err(CanonicalError::UnsafeInteger);
