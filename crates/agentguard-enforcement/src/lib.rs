@@ -159,15 +159,43 @@ pub enum PermitConsumptionStoreError {
 ///
 /// Possessing this value does not execute an action. The caller may proceed to
 /// a separately controlled effect adapter only after receiving it.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// A one-shot enforcement capability returned only after atomic permit consumption.
+///
+/// Fields are private and the type is intentionally not `Clone`; downstream
+/// effect adapters must take ownership rather than accept caller-constructed claims.
+#[must_use = "a consumed permit must be passed directly to the protected effect adapter"]
+#[derive(Debug, PartialEq, Eq)]
 pub struct ConsumedPermitV2 {
-    pub tenant_id: String,
-    pub permit_id: String,
-    pub request_id: String,
-    pub action_digest: String,
-    pub policy_digest: String,
-    pub envelope_digest: String,
-    pub expires_at: String,
+    tenant_id: String,
+    permit_id: String,
+    request_id: String,
+    action_digest: String,
+    policy_digest: String,
+    envelope_digest: String,
+    expires_at: String,
+}
+
+impl ConsumedPermitV2 {
+    #[must_use]
+    pub fn tenant_id(&self) -> &str { &self.tenant_id }
+
+    #[must_use]
+    pub fn permit_id(&self) -> &str { &self.permit_id }
+
+    #[must_use]
+    pub fn request_id(&self) -> &str { &self.request_id }
+
+    #[must_use]
+    pub fn action_digest(&self) -> &str { &self.action_digest }
+
+    #[must_use]
+    pub fn policy_digest(&self) -> &str { &self.policy_digest }
+
+    #[must_use]
+    pub fn envelope_digest(&self) -> &str { &self.envelope_digest }
+
+    #[must_use]
+    pub fn expires_at(&self) -> &str { &self.expires_at }
 }
 
 /// Fail-closed errors raised by the enforcement boundary.
