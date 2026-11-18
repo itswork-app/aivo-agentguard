@@ -14,7 +14,12 @@ pub const MAX_CANONICAL_INPUT_BYTES: usize = 1_048_576;
 
 /// Maximum absolute integer value accepted by the `AgentGuard` v1 profile.
 pub const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
+/// Maximum container nesting depth accepted by the `AgentGuard` v1 profile.
+pub const MAX_NESTING_DEPTH: usize = 128;
 const MAX_SAFE_INTEGER_DECIMAL: &[u8] = b"9007199254740991";
+const ERR_DUPLICATE_KEY: &str = "AG_CANONICAL_DUPLICATE_KEY";
+const ERR_FLOAT_NOT_ALLOWED: &str = "AG_CANONICAL_FLOAT_NOT_ALLOWED";
+const ERR_UNSAFE_INTEGER: &str = "AG_CANONICAL_UNSAFE_INTEGER";
 
 /// Stable, non-sensitive canonicalization failure categories.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -136,7 +141,7 @@ impl<'de> Visitor<'de> for StrictValueVisitor {
         E: de::Error,
     {
         if value.unsigned_abs() > MAX_SAFE_INTEGER {
-            return Err(E::custom("integer is outside the safe integer range"));
+            return Err(E::custom(ERR_UNSAFE_INTEGER));
         }
         Ok(StrictValue::Integer(value))
     }
@@ -146,7 +151,7 @@ impl<'de> Visitor<'de> for StrictValueVisitor {
         E: de::Error,
     {
         if value > MAX_SAFE_INTEGER {
-            return Err(E::custom("integer is outside the safe integer range"));
+            return Err(E::custom(ERR_UNSAFE_INTEGER));
         }
         Ok(StrictValue::Unsigned(value))
     }
@@ -161,7 +166,7 @@ impl<'de> Visitor<'de> for StrictValueVisitor {
         if value == 0.0 && value.is_sign_negative() {
             return Ok(StrictValue::Integer(0));
         }
-        Err(E::custom("floating-point values are not allowed"))
+        Err(E::custom(ERR_FLOAT_NOT_ALLOWED))
     }
 
     fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
@@ -197,7 +202,7 @@ impl<'de> Visitor<'de> for StrictValueVisitor {
         let mut entries = Vec::new();
         while let Some(key) = object.next_key::<String>()? {
             if !seen.insert(key.clone()) {
-                return Err(de::Error::custom("duplicate object member"));
+                return Err(de::Error::custom(ERR_DUPLICATE_KEY));
             }
             let value = object.next_value()?;
             entries.push((key, value));
@@ -207,18 +212,60 @@ impl<'de> Visitor<'de> for StrictValueVisitor {
 }
 
 fn classify_json_error(error: &serde_json::Error) -> CanonicalError {
+    // serde_json exposes custom visitor failures as Data errors. We use
+    // private, stable sentinel codes for our own visitor failures rather than
+    // matching human-readable parser diagnostics or recursion-limit text.
+    if error.classify() != serde_json::error::Category::Data {
+        return CanonicalError::InvalidJson;
+    }
+
     let message = error.to_string();
-    if message.contains("duplicate object member") {
+    if message.contains(ERR_DUPLICATE_KEY) {
         CanonicalError::DuplicateKey
-    } else if message.contains("floating-point values are not allowed") {
+    } else if message.contains(ERR_FLOAT_NOT_ALLOWED) {
         CanonicalError::FloatNotAllowed
-    } else if message.contains("integer is outside the safe integer range") {
+    } else if message.contains(ERR_UNSAFE_INTEGER) {
         CanonicalError::UnsafeInteger
-    } else if message.contains("recursion limit exceeded") {
-        CanonicalError::NestingLimitExceeded
     } else {
         CanonicalError::InvalidJson
     }
+}
+
+// Count structural nesting outside JSON strings. This is an explicit
+// AgentGuard limit and does not depend on serde_json's internal recursion
+// guard or its diagnostic wording. Malformed delimiter structure remains the
+// JSON parser's responsibility.
+fn exceeds_nesting_limit(input: &[u8]) -> bool {
+    let mut depth = 0_usize;
+    let mut in_string = false;
+    let mut escaped = false;
+
+    for byte in input {
+        if in_string {
+            if escaped {
+                escaped = false;
+            } else if *byte == b'\\\\' {
+                escaped = true;
+            } else if *byte == b'"' {
+                in_string = false;
+            }
+            continue;
+        }
+
+        match *byte {
+            b'"' => in_string = true,
+            b'{' | b'[' => {
+                depth += 1;
+                if depth > MAX_NESTING_DEPTH {
+                    return true;
+                }
+            }
+            b'}' | b']' => depth = depth.saturating_sub(1),
+            _ => {}
+        }
+    }
+
+    false
 }
 
 // Replaces oversized integer tokens before the syntax-only parse. This lets
@@ -300,8 +347,13 @@ pub fn canonicalize_json(input: &[u8]) -> Result<Vec<u8>, CanonicalError> {
         return Err(CanonicalError::InputTooLarge);
     }
 
+    if exceeds_nesting_limit(input) {
+        return Err(CanonicalError::NestingLimitExceeded);
+    }
+
     let (syntax_input, has_unsafe_integer) = sanitize_unsafe_integer_tokens(input);
     let mut syntax = serde_json::Deserializer::from_slice(&syntax_input);
+    syntax.disable_recursion_limit();
     IgnoredAny::deserialize(&mut syntax)
         .and_then(|_| syntax.end())
         .map_err(|error| classify_json_error(&error))?;
@@ -310,7 +362,10 @@ pub fn canonicalize_json(input: &[u8]) -> Result<Vec<u8>, CanonicalError> {
         return Err(CanonicalError::UnsafeInteger);
     }
 
-    let value = serde_json::from_slice::<StrictValue>(input)
+    let mut strict = serde_json::Deserializer::from_slice(input);
+    strict.disable_recursion_limit();
+    let value = StrictValue::deserialize(&mut strict)
+        .and_then(|value| strict.end().map(|()| value))
         .map_err(|error| classify_json_error(&error))?;
 
     let mut output = Vec::with_capacity(input.len());
@@ -431,18 +486,32 @@ mod tests {
     }
 
     #[test]
-    fn enforces_input_size_and_parser_nesting_limits() {
+    fn enforces_input_size_and_explicit_nesting_limits() {
         let oversized = vec![b' '; MAX_CANONICAL_INPUT_BYTES + 1];
         assert_eq!(
             canonicalize_json(&oversized),
             Err(CanonicalError::InputTooLarge)
         );
 
-        let deeply_nested = format!("{}null{}", "[".repeat(130), "]".repeat(130));
+        let at_limit = format!("{}null{}", "[".repeat(MAX_NESTING_DEPTH), "]".repeat(MAX_NESTING_DEPTH));
+        assert!(canonicalize_json(at_limit.as_bytes()).is_ok());
+
+        let over_limit = format!("{}null{}", "[".repeat(MAX_NESTING_DEPTH + 1), "]".repeat(MAX_NESTING_DEPTH + 1));
         assert_eq!(
-            canonicalize_json(deeply_nested.as_bytes()),
+            canonicalize_json(over_limit.as_bytes()),
             Err(CanonicalError::NestingLimitExceeded)
         );
+
+        // Brackets inside strings do not contribute to structural depth.
+        let string_brackets = format!(r#"{{"s":"{}"}}"#, "[".repeat(MAX_NESTING_DEPTH + 1));
+        assert!(canonicalize_json(string_brackets.as_bytes()).is_ok());
+    }
+
+    #[test]
+    fn canonical_string_escaping_covers_every_c0_control() {
+        let input = br#"{"s":"\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\b\t\n\u000b\f\r\u000e\u000f\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001a\u001b\u001c\u001d\u001e\u001f"}"#;
+        let expected = br#"{"s":"\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\b\t\n\u000b\f\r\u000e\u000f\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001a\u001b\u001c\u001d\u001e\u001f"}"#;
+        assert_eq!(canonicalize_json(input).unwrap(), expected);
     }
 
     #[test]
