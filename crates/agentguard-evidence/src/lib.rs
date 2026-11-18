@@ -1240,7 +1240,10 @@ mod tests {
             tenant_id: &str,
             stream_id: &str,
         ) -> Result<Option<EvidenceStreamHead>, EvidenceStoreError> {
-            let streams = self.streams.lock().map_err(|_| EvidenceStoreError::Unavailable)?;
+            let streams = self
+                .streams
+                .lock()
+                .map_err(|_| EvidenceStoreError::Unavailable)?;
             Ok(streams
                 .get(&(tenant_id.to_owned(), stream_id.to_owned()))
                 .and_then(|events| events.last())
@@ -1259,7 +1262,10 @@ mod tests {
                 return Err(EvidenceStoreError::HeadConflict);
             }
             verify_event(event).map_err(|_| EvidenceStoreError::Rejected)?;
-            let mut streams = self.streams.lock().map_err(|_| EvidenceStoreError::Unavailable)?;
+            let mut streams = self
+                .streams
+                .lock()
+                .map_err(|_| EvidenceStoreError::Unavailable)?;
             let key = (event.tenant_id.clone(), event.stream_id.clone());
             let events = streams.entry(key).or_default();
             let actual = events.last().map(|stored| EvidenceStreamHead {
@@ -1269,9 +1275,11 @@ mod tests {
             if actual.as_ref() != expected {
                 return Err(EvidenceStoreError::HeadConflict);
             }
-            let expected_sequence = actual.map_or(1, |head| head.sequence + 1);
+            let expected_sequence = actual.map_or(1, |head| head.sequence.saturating_add(1));
             if event.sequence != expected_sequence
-                || events.iter().any(|stored| stored.event.event_id == event.event_id)
+                || events
+                    .iter()
+                    .any(|stored| stored.event.event_id == event.event_id)
             {
                 return Err(EvidenceStoreError::Duplicate);
             }
@@ -1294,7 +1302,11 @@ mod tests {
             let streams = self.streams.lock().map_err(|_| EvidenceStoreError::Unavailable)?;
             Ok(streams
                 .get(&(tenant_id.to_owned(), stream_id.to_owned()))
-                .and_then(|events| events.iter().find(|stored| stored.event.sequence == sequence))
+                .and_then(|events| {
+                    events
+                        .iter()
+                        .find(|stored| stored.event.sequence == sequence)
+                })
                 .cloned())
         }
     }
