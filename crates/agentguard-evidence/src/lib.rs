@@ -505,17 +505,15 @@ pub trait AppendOnlyEvidenceStore {
     ) -> Result<Vec<EvidenceEventV1>, Self::Error>;
 }
 
-
 // ---- Durable evidence service and signed receipt contracts (G3) ----
 
 use agentguard_core::{
-    CryptoError, SignatureAlgorithm, SignatureEnvelope, canonical_json, domain_digest,
-    hex_digest, verify_ed25519,
+    CryptoError, SignatureAlgorithm, SignatureEnvelope, canonical_json, domain_digest, hex_digest,
+    verify_ed25519,
 };
 use thiserror::Error;
 
-pub const RECEIPT_SIGNATURE_DOMAIN: &[u8] =
-    b"AIVO-AGENTGUARD-EVIDENCE-RECEIPT-V1\\0";
+pub const RECEIPT_SIGNATURE_DOMAIN: &[u8] = b"AIVO-AGENTGUARD-EVIDENCE-RECEIPT-V1\\0";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EvidenceStreamHead {
@@ -657,8 +655,8 @@ impl SignedEvidenceReceiptV1 {
         {
             return Err(EvidenceServiceError::ReceiptKeyMismatch);
         }
-        let claims = canonical_json(&self.claims)
-            .map_err(|_| EvidenceServiceError::Canonicalization)?;
+        let claims =
+            canonical_json(&self.claims).map_err(|_| EvidenceServiceError::Canonicalization)?;
         verify_ed25519(
             public_key,
             &self.signature,
@@ -763,7 +761,10 @@ pub fn append_with_durable_receipt<S: EvidenceStore, K: EvidenceReceiptSigner>(
             .map_err(|_| EvidenceServiceError::Store)?;
         let (sequence, previous_hash) = match &head {
             Some(value) => (
-                value.sequence.checked_add(1).ok_or(EvidenceServiceError::InvalidEvent)?,
+                value
+                    .sequence
+                    .checked_add(1)
+                    .ok_or(EvidenceServiceError::InvalidEvent)?,
                 value.event_hash.clone(),
             ),
             None => (1, GENESIS_PREVIOUS_HASH.to_owned()),
@@ -786,8 +787,8 @@ pub fn append_with_durable_receipt<S: EvidenceStore, K: EvidenceReceiptSigner>(
             reason_codes: request.reason_codes.clone(),
             correction_of_event_id: request.correction_of_event_id.clone(),
         };
-        let event = seal_event(draft, &previous_hash)
-            .map_err(|_| EvidenceServiceError::InvalidEvent)?;
+        let event =
+            seal_event(draft, &previous_hash).map_err(|_| EvidenceServiceError::InvalidEvent)?;
         let commit = match store.append_if_head_matches(&event, head.as_ref()) {
             Ok(value) => value,
             Err(EvidenceStoreError::HeadConflict) => continue,
@@ -814,16 +815,29 @@ pub fn append_with_durable_receipt<S: EvidenceStore, K: EvidenceReceiptSigner>(
             sequence: event.sequence,
             event_hash: event.event_hash.clone(),
             event_type: event.event_type.as_str().to_owned(),
-            request_digest: request.request_digest.clone().ok_or(EvidenceServiceError::InvalidEvent)?,
-            action_digest: request.action_digest.clone().ok_or(EvidenceServiceError::InvalidEvent)?,
-            policy_digest: request.policy_digest.clone().ok_or(EvidenceServiceError::InvalidEvent)?,
-            context_digest: request.context_digest.clone().ok_or(EvidenceServiceError::InvalidEvent)?,
+            request_digest: request
+                .request_digest
+                .clone()
+                .ok_or(EvidenceServiceError::InvalidEvent)?,
+            action_digest: request
+                .action_digest
+                .clone()
+                .ok_or(EvidenceServiceError::InvalidEvent)?,
+            policy_digest: request
+                .policy_digest
+                .clone()
+                .ok_or(EvidenceServiceError::InvalidEvent)?,
+            context_digest: request
+                .context_digest
+                .clone()
+                .ok_or(EvidenceServiceError::InvalidEvent)?,
             storage_commit_id: commit.commit_id,
             committed_at: committed_at.to_owned(),
             evidence_key_id: evidence_key_id.to_owned(),
         };
         validate_receipt(&claims)?;
-        let claims_bytes = canonical_json(&claims).map_err(|_| EvidenceServiceError::Canonicalization)?;
+        let claims_bytes =
+            canonical_json(&claims).map_err(|_| EvidenceServiceError::Canonicalization)?;
         let signature = signer
             .sign_receipt(&domain_message(RECEIPT_SIGNATURE_DOMAIN, &claims_bytes))
             .map_err(|_| EvidenceServiceError::Signer)?;
@@ -835,7 +849,11 @@ pub fn append_with_durable_receipt<S: EvidenceStore, K: EvidenceReceiptSigner>(
         }
         let receipt = SignedEvidenceReceiptV1 { claims, signature };
         let receipt_digest = hex_digest(&receipt.digest()?);
-        return Ok(EvidenceAppendResult { event, receipt, receipt_digest });
+        return Ok(EvidenceAppendResult {
+            event,
+            receipt,
+            receipt_digest,
+        });
     }
     Err(EvidenceServiceError::Contention)
 }
@@ -882,16 +900,23 @@ fn validate_receipt(c: &EvidenceReceiptClaimsV1) -> Result<(), EvidenceServiceEr
         return Err(EvidenceServiceError::InvalidReceipt);
     }
     for value in [
-        c.receipt_id.as_str(), c.tenant_id.as_str(), c.stream_id.as_str(),
-        c.event_type.as_str(), c.storage_commit_id.as_str(), c.evidence_key_id.as_str(),
+        c.receipt_id.as_str(),
+        c.tenant_id.as_str(),
+        c.stream_id.as_str(),
+        c.event_type.as_str(),
+        c.storage_commit_id.as_str(),
+        c.evidence_key_id.as_str(),
     ] {
         if value.is_empty() || value.trim() != value || value.len() > 256 {
             return Err(EvidenceServiceError::InvalidReceipt);
         }
     }
     for value in [
-        c.event_hash.as_str(), c.request_digest.as_str(), c.action_digest.as_str(),
-        c.policy_digest.as_str(), c.context_digest.as_str(),
+        c.event_hash.as_str(),
+        c.request_digest.as_str(),
+        c.action_digest.as_str(),
+        c.policy_digest.as_str(),
+        c.context_digest.as_str(),
     ] {
         if !is_lower_hex_digest(value) {
             return Err(EvidenceServiceError::InvalidReceipt);
