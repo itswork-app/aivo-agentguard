@@ -221,14 +221,19 @@ fn classify_json_error(error: &serde_json::Error) -> CanonicalError {
     }
 }
 
-// Called only after serde_json has validated the complete JSON grammar. This
-// lexical pass preserves integer-token precision even when a token exceeds
-// serde_json's native u64/i64 representation and would otherwise visit f64.
-fn contains_unsafe_integer_token(input: &[u8]) -> bool {
+// Replaces oversized integer tokens before the syntax-only parse. This lets
+// serde_json validate the surrounding JSON grammar even when the original
+// integer is too large for its numeric parser (including values beyond f64).
+// Strings are copied byte-for-byte and never scanned as numeric content.
+fn sanitize_unsafe_integer_tokens(input: &[u8]) -> (Vec<u8>, bool) {
+    let mut sanitized = Vec::with_capacity(input.len());
     let mut index = 0;
+    let mut found_unsafe_integer = false;
+
     while index < input.len() {
         match input[index] {
             b'"' => {
+                let start = index;
                 index += 1;
                 while index < input.len() {
                     match input[index] {
@@ -240,6 +245,7 @@ fn contains_unsafe_integer_token(input: &[u8]) -> bool {
                         _ => index += 1,
                     }
                 }
+                sanitized.extend_from_slice(&input[start..index]);
             }
             b'-' | b'0'..=b'9' => {
                 let start = index;
@@ -251,21 +257,31 @@ fn contains_unsafe_integer_token(input: &[u8]) -> bool {
                 {
                     index += 1;
                 }
+
                 let token = &input[start..index];
-                if !token.iter().any(|byte| matches!(byte, b'.' | b'e' | b'E')) {
-                    let digits = token.strip_prefix(b"-").unwrap_or(token);
-                    if digits.len() > MAX_SAFE_INTEGER_DECIMAL.len()
+                let digits = token.strip_prefix(b"-").unwrap_or(token);
+                let is_integer_token = !digits.is_empty()
+                    && digits.iter().all(u8::is_ascii_digit);
+                let is_unsafe_integer = is_integer_token
+                    && (digits.len() > MAX_SAFE_INTEGER_DECIMAL.len()
                         || (digits.len() == MAX_SAFE_INTEGER_DECIMAL.len()
-                            && digits > MAX_SAFE_INTEGER_DECIMAL)
-                    {
-                        return true;
-                    }
+                            && digits > MAX_SAFE_INTEGER_DECIMAL));
+
+                if is_unsafe_integer {
+                    sanitized.push(b'0');
+                    found_unsafe_integer = true;
+                } else {
+                    sanitized.extend_from_slice(token);
                 }
             }
-            _ => index += 1,
+            byte => {
+                sanitized.push(byte);
+                index += 1;
+            }
         }
     }
-    false
+
+    (sanitized, found_unsafe_integer)
 }
 
 /// Parses and canonicalizes raw JSON under the `AgentGuard` v1 numeric profile.
@@ -283,12 +299,13 @@ pub fn canonicalize_json(input: &[u8]) -> Result<Vec<u8>, CanonicalError> {
         return Err(CanonicalError::InputTooLarge);
     }
 
-    let mut syntax = serde_json::Deserializer::from_slice(input);
+    let (syntax_input, has_unsafe_integer) = sanitize_unsafe_integer_tokens(input);
+    let mut syntax = serde_json::Deserializer::from_slice(&syntax_input);
     IgnoredAny::deserialize(&mut syntax)
         .and_then(|_| syntax.end())
         .map_err(|error| classify_json_error(&error))?;
 
-    if contains_unsafe_integer_token(input) {
+    if has_unsafe_integer {
         return Err(CanonicalError::UnsafeInteger);
     }
 
