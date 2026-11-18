@@ -1417,6 +1417,28 @@ mod tests {
     }
 
     #[test]
+    fn deny_and_approval_decisions_are_durable_without_execution_receipts() {
+        let store = MemoryEvidenceStore::default();
+
+        let mut deny = append_request();
+        deny.event_id = "deny-event-1".to_owned();
+        deny.decision = Some(DecisionOutcome::Deny);
+        let deny_event = append_event_durably(&store, "tenant-1", &deny).unwrap();
+        assert_eq!(deny_event.event.decision, Some(DecisionOutcome::Deny));
+        assert_eq!(deny_event.event.sequence, 1);
+
+        let mut approval = append_request();
+        approval.event_id = "approval-event-1".to_owned();
+        approval.decision = Some(DecisionOutcome::RequireApproval);
+        let approval_event = append_event_durably(&store, "tenant-1", &approval).unwrap();
+        assert_eq!(
+            approval_event.event.decision,
+            Some(DecisionOutcome::RequireApproval)
+        );
+        assert_eq!(approval_event.event.sequence, 2);
+    }
+
+    #[test]
     fn signer_failure_does_not_rollback_committed_evidence() {
         let store = MemoryEvidenceStore::default();
         let result = append_with_durable_receipt(
