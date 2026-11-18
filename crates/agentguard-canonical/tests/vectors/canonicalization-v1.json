@@ -88,6 +88,16 @@
       "expected_error": "UnsafeInteger"
     },
     {
+      "id": "unsafe-integer-beyond-u64",
+      "input_json": "18446744073709551616",
+      "expected_error": "UnsafeInteger"
+    },
+    {
+      "id": "unsafe-negative-integer-beyond-i64",
+      "input_json": "-18446744073709551616",
+      "expected_error": "UnsafeInteger"
+    },
+    {
       "id": "malformed-json",
       "input_json": "{\"a\":",
       "expected_error": "InvalidJson"
