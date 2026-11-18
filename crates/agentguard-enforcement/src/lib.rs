@@ -11,7 +11,8 @@ use agentguard_core::{
     SignedRevocationSnapshotV1, persist_verified_snapshot,
 };
 use agentguard_evidence::{
-    DecisionOutcome, EvidenceEventType, EvidenceStore, SignedEvidenceReceiptV1, verify_receipt_read_back,
+    DecisionOutcome, EvidenceEventType, EvidenceStore, SignedEvidenceReceiptV1,
+    verify_receipt_read_back,
 };
 use serde::{Deserialize, Serialize};
 
