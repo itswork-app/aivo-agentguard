@@ -260,7 +260,9 @@ fn sanitize_unsafe_integer_tokens(input: &[u8]) -> (Vec<u8>, bool) {
 
                 let token = &input[start..index];
                 let digits = token.strip_prefix(b"-").unwrap_or(token);
-                let is_integer_token = !digits.is_empty() && digits.iter().all(u8::is_ascii_digit);
+                let is_integer_token = !digits.is_empty()
+                    && digits.iter().all(u8::is_ascii_digit)
+                    && (digits.len() == 1 || digits[0] != b'0');
                 let is_unsafe_integer = is_integer_token
                     && (digits.len() > MAX_SAFE_INTEGER_DECIMAL.len()
                         || (digits.len() == MAX_SAFE_INTEGER_DECIMAL.len()
@@ -512,6 +514,12 @@ mod tests {
         let malformed = format!("{}1:", "9".repeat(400));
         assert_eq!(
             canonicalize_json(malformed.as_bytes()),
+            Err(CanonicalError::InvalidJson)
+        );
+
+        let leading_zero = format!("0{}", "9".repeat(400));
+        assert_eq!(
+            canonicalize_json(leading_zero.as_bytes()),
             Err(CanonicalError::InvalidJson)
         );
     }
