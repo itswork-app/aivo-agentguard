@@ -935,7 +935,6 @@ fn domain_message(domain: &[u8], payload: &[u8]) -> Vec<u8> {
     message
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1127,4 +1126,3 @@ mod tests {
         );
     }
 }
-
