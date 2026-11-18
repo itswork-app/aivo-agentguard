@@ -1462,5 +1462,4 @@ mod tests {
             Err(EvidenceServiceError::InvalidSignature)
         );
     }
-
 }
