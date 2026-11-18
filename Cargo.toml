@@ -3,6 +3,7 @@ resolver = "2"
 members = [
   "crates/agentguard-core",
   "crates/agentguard-policy",
+  "crates/agentguard-canonical",
   "crates/agentguard-evidence",
   "crates/agentguard-runtime",
   "crates/agentguard-enforcement",

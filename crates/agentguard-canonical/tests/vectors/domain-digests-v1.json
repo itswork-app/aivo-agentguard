@@ -1,0 +1,41 @@
+{
+  "schema_version": "agentguard.canonical-v1",
+  "canonical_json_utf8": "{\"a\":1}",
+  "vectors": [
+    {
+      "id": "request-minimal-object-v1",
+      "domain": "REQUEST",
+      "domain_separator_hex": "4149564f2d4147454e5447554152442d524551554553542d563100",
+      "preimage_hex": "4149564f2d4147454e5447554152442d524551554553542d5631007b2261223a317d",
+      "sha256_hex": "79df7b062753d4be8799d067dc6ac7a46d11d2f0dadebb2a4f0cda08469050a0"
+    },
+    {
+      "id": "action-minimal-object-v1",
+      "domain": "ACTION",
+      "domain_separator_hex": "4149564f2d4147454e5447554152442d414354494f4e2d563100",
+      "preimage_hex": "4149564f2d4147454e5447554152442d414354494f4e2d5631007b2261223a317d",
+      "sha256_hex": "68fdf699b32a715fc457fc1a9fc85c2631d2171f34b907deb2c2b5ac51f8b9ca"
+    },
+    {
+      "id": "policy-minimal-object-v1",
+      "domain": "POLICY",
+      "domain_separator_hex": "4149564f2d4147454e5447554152442d504f4c4943592d563100",
+      "preimage_hex": "4149564f2d4147454e5447554152442d504f4c4943592d5631007b2261223a317d",
+      "sha256_hex": "642d1bcac4d75ae29280230c3403d4e5e2f8f8993807aee08279ab85175bcdc5"
+    },
+    {
+      "id": "permit-minimal-object-v1",
+      "domain": "PERMIT",
+      "domain_separator_hex": "4149564f2d4147454e5447554152442d5045524d49542d563100",
+      "preimage_hex": "4149564f2d4147454e5447554152442d5045524d49542d5631007b2261223a317d",
+      "sha256_hex": "b873e3ce4b09c0a8ff256bc436adec23fe2c1de9ef7104f0809fa2471ec16016"
+    },
+    {
+      "id": "event-minimal-object-v1",
+      "domain": "EVENT",
+      "domain_separator_hex": "4149564f2d4147454e5447554152442d4556454e542d563100",
+      "preimage_hex": "4149564f2d4147454e5447554152442d4556454e542d5631007b2261223a317d",
+      "sha256_hex": "57f571751bf4e6cfe4b4a6ab95c2bf3ac5de13e1587dd3863fbce26a97dd054e"
+    }
+  ]
+}

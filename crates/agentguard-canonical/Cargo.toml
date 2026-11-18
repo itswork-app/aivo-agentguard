@@ -1,0 +1,18 @@
+[package]
+name = "agentguard-canonical"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+serde = "1.0"
+serde_json = { version = "1.0", features = ["unbounded_depth"] }
+sha2 = "0.10"
+
+[lib]
+path = "src/lib.rs"
+
+[lints]
+workspace = true
