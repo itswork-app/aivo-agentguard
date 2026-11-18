@@ -1,5 +1,5 @@
 //! Compatibility facade routing G3 protocol serialization through the
-//! single strict AgentGuard canonicalization implementation.
+//! single strict `AgentGuard` canonicalization implementation.
 
 use serde::Serialize;
 use sha2::{Digest, Sha256};
@@ -7,7 +7,12 @@ use sha2::{Digest, Sha256};
 pub type CanonicalizationError = agentguard_canonical::CanonicalError;
 
 /// Serialize typed protocol claims and canonicalize them with the shared
-/// AgentGuard v1 profile. Protocol structs must reject unknown fields.
+/// `AgentGuard` v1 profile. Protocol structs must reject unknown fields.
+///
+/// # Errors
+///
+/// Returns an error when serialization fails or the strict canonical JSON
+/// profile rejects the encoded protocol value.
 pub fn canonical_json<T: Serialize>(value: &T) -> Result<Vec<u8>, CanonicalizationError> {
     let encoded =
         serde_json::to_vec(value).map_err(|_| CanonicalizationError::SerializationFailure)?;
