@@ -508,7 +508,7 @@ pub trait AppendOnlyEvidenceStore {
 // ---- Durable evidence service and signed receipt contracts (G3) ----
 
 use agentguard_core::{
-    CryptoError, SignatureAlgorithm, SignatureEnvelope, canonical_json, domain_digest, hex_digest,
+    SignatureAlgorithm, SignatureEnvelope, canonical_json, domain_digest, hex_digest,
     verify_ed25519,
 };
 use thiserror::Error;
@@ -720,14 +720,12 @@ pub struct EvidenceAppendRequestV1 {
 /// # Errors
 /// Returns an error for invalid event data, storage contention/failure, read-back mismatch,
 /// canonicalization failure, or receipt signer failure.
-pub fn append_with_durable_receipt<S: EvidenceStore, K: EvidenceReceiptSigner>(
-    store: &S,
-    signer: &K,
+fn validate_append_request(
     request: &EvidenceAppendRequestV1,
     receipt_id: &str,
     committed_at: &str,
     evidence_key_id: &str,
-) -> Result<EvidenceAppendResult, EvidenceServiceError> {
+) -> Result<(), EvidenceServiceError> {
     if request.event_type != EvidenceEventType::DecisionRecorded
         || request.decision != Some(DecisionOutcome::Allow)
         || request.request_digest.is_none()
@@ -754,41 +752,115 @@ pub fn append_with_durable_receipt<S: EvidenceStore, K: EvidenceReceiptSigner>(
     if !is_utc_rfc3339(committed_at) {
         return Err(EvidenceServiceError::InvalidEvent);
     }
+    Ok(())
+}
+
+fn build_append_event(
+    request: &EvidenceAppendRequestV1,
+    head: Option<&EvidenceStreamHead>,
+) -> Result<EvidenceEventV1, EvidenceServiceError> {
+    let (sequence, previous_hash) = match head {
+        Some(value) => (
+            value
+                .sequence
+                .checked_add(1)
+                .ok_or(EvidenceServiceError::InvalidEvent)?,
+            value.event_hash.clone(),
+        ),
+        None => (1, GENESIS_PREVIOUS_HASH.to_owned()),
+    };
+    let draft = EvidenceEventDraftV1 {
+        schema_version: "agentguard.evidence-v1".to_owned(),
+        event_id: request.event_id.clone(),
+        tenant_id: request.tenant_id.clone(),
+        stream_id: request.stream_id.clone(),
+        sequence,
+        occurred_at: request.occurred_at.clone(),
+        event_type: request.event_type,
+        request_id: request.request_id.clone(),
+        actor_ref: request.actor_ref.clone(),
+        request_digest: request.request_digest.clone(),
+        action_digest: request.action_digest.clone(),
+        policy_digest: request.policy_digest.clone(),
+        context_digest: request.context_digest.clone(),
+        decision: request.decision,
+        reason_codes: request.reason_codes.clone(),
+        correction_of_event_id: request.correction_of_event_id.clone(),
+    };
+    seal_event(draft, &previous_hash).map_err(|_| EvidenceServiceError::InvalidEvent)
+}
+
+fn create_signed_receipt<K: EvidenceReceiptSigner>(
+    signer: &K,
+    event: &EvidenceEventV1,
+    commit: &DurableCommitRef,
+    receipt_id: &str,
+    committed_at: &str,
+    evidence_key_id: &str,
+) -> Result<SignedEvidenceReceiptV1, EvidenceServiceError> {
+    let claims = EvidenceReceiptClaimsV1 {
+        schema_version: 1,
+        receipt_id: receipt_id.to_owned(),
+        tenant_id: event.tenant_id.clone(),
+        stream_id: event.stream_id.clone(),
+        sequence: event.sequence,
+        event_hash: event.event_hash.clone(),
+        event_type: event.event_type.as_str().to_owned(),
+        request_digest: event
+            .request_digest
+            .clone()
+            .ok_or(EvidenceServiceError::InvalidEvent)?,
+        action_digest: event
+            .action_digest
+            .clone()
+            .ok_or(EvidenceServiceError::InvalidEvent)?,
+        policy_digest: event
+            .policy_digest
+            .clone()
+            .ok_or(EvidenceServiceError::InvalidEvent)?,
+        context_digest: event
+            .context_digest
+            .clone()
+            .ok_or(EvidenceServiceError::InvalidEvent)?,
+        storage_commit_id: commit.commit_id.clone(),
+        committed_at: committed_at.to_owned(),
+        evidence_key_id: evidence_key_id.to_owned(),
+    };
+    validate_receipt(&claims)?;
+    let claims_bytes =
+        canonical_json(&claims).map_err(|_| EvidenceServiceError::Canonicalization)?;
+    let signature = signer
+        .sign_receipt(&domain_message(RECEIPT_SIGNATURE_DOMAIN, &claims_bytes))
+        .map_err(|_| EvidenceServiceError::Signer)?;
+    if signature.algorithm != SignatureAlgorithm::Ed25519
+        || signature.key_id != evidence_key_id
+        || signature.validate_shape().is_err()
+    {
+        return Err(EvidenceServiceError::ReceiptKeyMismatch);
+    }
+    Ok(SignedEvidenceReceiptV1 { claims, signature })
+}
+
+/// Atomically append a decision event, verify durable read-back, then obtain a signed receipt.
+///
+/// # Errors
+/// Returns an error for invalid event data, storage contention/failure, read-back mismatch,
+/// canonicalization failure, or receipt signer failure.
+pub fn append_with_durable_receipt<S: EvidenceStore, K: EvidenceReceiptSigner>(
+    store: &S,
+    signer: &K,
+    request: &EvidenceAppendRequestV1,
+    receipt_id: &str,
+    committed_at: &str,
+    evidence_key_id: &str,
+) -> Result<EvidenceAppendResult, EvidenceServiceError> {
+    validate_append_request(request, receipt_id, committed_at, evidence_key_id)?;
 
     for _ in 0..8 {
         let head = store
             .read_head(&request.tenant_id, &request.stream_id)
             .map_err(|_| EvidenceServiceError::Store)?;
-        let (sequence, previous_hash) = match &head {
-            Some(value) => (
-                value
-                    .sequence
-                    .checked_add(1)
-                    .ok_or(EvidenceServiceError::InvalidEvent)?,
-                value.event_hash.clone(),
-            ),
-            None => (1, GENESIS_PREVIOUS_HASH.to_owned()),
-        };
-        let draft = EvidenceEventDraftV1 {
-            schema_version: "agentguard.evidence-v1".to_owned(),
-            event_id: request.event_id.clone(),
-            tenant_id: request.tenant_id.clone(),
-            stream_id: request.stream_id.clone(),
-            sequence,
-            occurred_at: request.occurred_at.clone(),
-            event_type: request.event_type,
-            request_id: request.request_id.clone(),
-            actor_ref: request.actor_ref.clone(),
-            request_digest: request.request_digest.clone(),
-            action_digest: request.action_digest.clone(),
-            policy_digest: request.policy_digest.clone(),
-            context_digest: request.context_digest.clone(),
-            decision: request.decision,
-            reason_codes: request.reason_codes.clone(),
-            correction_of_event_id: request.correction_of_event_id.clone(),
-        };
-        let event =
-            seal_event(draft, &previous_hash).map_err(|_| EvidenceServiceError::InvalidEvent)?;
+        let event = build_append_event(request, head.as_ref())?;
         let commit = match store.append_if_head_matches(&event, head.as_ref()) {
             Ok(value) => value,
             Err(EvidenceStoreError::HeadConflict) => continue,
@@ -807,47 +879,14 @@ pub fn append_with_durable_receipt<S: EvidenceStore, K: EvidenceReceiptSigner>(
             return Err(EvidenceServiceError::ReadBackMismatch);
         }
 
-        let claims = EvidenceReceiptClaimsV1 {
-            schema_version: 1,
-            receipt_id: receipt_id.to_owned(),
-            tenant_id: event.tenant_id.clone(),
-            stream_id: event.stream_id.clone(),
-            sequence: event.sequence,
-            event_hash: event.event_hash.clone(),
-            event_type: event.event_type.as_str().to_owned(),
-            request_digest: request
-                .request_digest
-                .clone()
-                .ok_or(EvidenceServiceError::InvalidEvent)?,
-            action_digest: request
-                .action_digest
-                .clone()
-                .ok_or(EvidenceServiceError::InvalidEvent)?,
-            policy_digest: request
-                .policy_digest
-                .clone()
-                .ok_or(EvidenceServiceError::InvalidEvent)?,
-            context_digest: request
-                .context_digest
-                .clone()
-                .ok_or(EvidenceServiceError::InvalidEvent)?,
-            storage_commit_id: commit.commit_id,
-            committed_at: committed_at.to_owned(),
-            evidence_key_id: evidence_key_id.to_owned(),
-        };
-        validate_receipt(&claims)?;
-        let claims_bytes =
-            canonical_json(&claims).map_err(|_| EvidenceServiceError::Canonicalization)?;
-        let signature = signer
-            .sign_receipt(&domain_message(RECEIPT_SIGNATURE_DOMAIN, &claims_bytes))
-            .map_err(|_| EvidenceServiceError::Signer)?;
-        if signature.algorithm != SignatureAlgorithm::Ed25519
-            || signature.key_id != evidence_key_id
-            || signature.validate_shape().is_err()
-        {
-            return Err(EvidenceServiceError::ReceiptKeyMismatch);
-        }
-        let receipt = SignedEvidenceReceiptV1 { claims, signature };
+        let receipt = create_signed_receipt(
+            signer,
+            &event,
+            &commit,
+            receipt_id,
+            committed_at,
+            evidence_key_id,
+        )?;
         let receipt_digest = hex_digest(&receipt.digest()?);
         return Ok(EvidenceAppendResult {
             event,
@@ -858,10 +897,6 @@ pub fn append_with_durable_receipt<S: EvidenceStore, K: EvidenceReceiptSigner>(
     Err(EvidenceServiceError::Contention)
 }
 
-/// Verify a signed receipt and read back the exact durable event it references.
-///
-/// # Errors
-/// Returns an error for invalid signatures, missing events, commit mismatch, or event-binding failure.
 pub fn verify_receipt_read_back<S: EvidenceStore>(
     store: &S,
     receipt: &SignedEvidenceReceiptV1,
