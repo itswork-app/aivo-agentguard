@@ -322,6 +322,11 @@ pub fn seal_event(
     if !is_lower_hex_digest(previous_event_hash) {
         return Err(EvidenceError::InvalidPreviousHash);
     }
+    if (draft.sequence == 1 && previous_event_hash != GENESIS_PREVIOUS_HASH)
+        || (draft.sequence > 1 && previous_event_hash == GENESIS_PREVIOUS_HASH)
+    {
+        return Err(EvidenceError::PreviousHashMismatch);
+    }
     let mut event = EvidenceEventV1 {
         schema_version: draft.schema_version,
         event_id: draft.event_id,
@@ -373,6 +378,11 @@ pub fn verify_event(event: &EvidenceEventV1) -> Result<(), EvidenceError> {
     validate_draft(&draft)?;
     if !is_lower_hex_digest(&event.previous_event_hash) {
         return Err(EvidenceError::InvalidPreviousHash);
+    }
+    if (event.sequence == 1 && event.previous_event_hash != GENESIS_PREVIOUS_HASH)
+        || (event.sequence > 1 && event.previous_event_hash == GENESIS_PREVIOUS_HASH)
+    {
+        return Err(EvidenceError::PreviousHashMismatch);
     }
     if !is_lower_hex_digest(&event.event_hash) {
         return Err(EvidenceError::InvalidEventHash);
@@ -537,6 +547,19 @@ mod tests {
         let mut events = two_event_stream();
         events[1].stream_id = "stream-2".to_owned();
         assert_eq!(verify_stream(&events), Err(EvidenceError::StreamMismatch));
+    }
+
+    #[test]
+    fn enforces_genesis_only_for_the_first_sequence() {
+        let non_genesis = "1".repeat(64);
+        assert_eq!(
+            seal_event(draft(1, "event-1"), &non_genesis),
+            Err(EvidenceError::PreviousHashMismatch)
+        );
+        assert_eq!(
+            seal_event(draft(2, "event-2"), GENESIS_PREVIOUS_HASH),
+            Err(EvidenceError::PreviousHashMismatch)
+        );
     }
 
     #[test]
