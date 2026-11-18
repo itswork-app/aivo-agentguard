@@ -3,7 +3,7 @@
 //! This crate prepares and verifies evidence records. It does not provide a
 //! durable store; production adapters must implement atomic durable append.
 
-use agentguard_canonical::{digest_hex, DigestDomain};
+use agentguard_canonical::{DigestDomain, digest_hex};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -12,19 +12,32 @@ pub const GENESIS_PREVIOUS_HASH: &str =
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EvidenceEventType {
-    #[serde(rename = "REQUEST_RECEIVED")] RequestReceived,
-    #[serde(rename = "DECISION_RECORDED")] DecisionRecorded,
-    #[serde(rename = "APPROVAL_REQUESTED")] ApprovalRequested,
-    #[serde(rename = "APPROVAL_RECORDED")] ApprovalRecorded,
-    #[serde(rename = "APPROVAL_REJECTED")] ApprovalRejected,
-    #[serde(rename = "POLICY_REEVALUATED")] PolicyReevaluated,
-    #[serde(rename = "PERMIT_ISSUED")] PermitIssued,
-    #[serde(rename = "PERMIT_CONSUMED")] PermitConsumed,
-    #[serde(rename = "ENFORCEMENT_REJECTED")] EnforcementRejected,
-    #[serde(rename = "EXECUTION_OBSERVED")] ExecutionObserved,
-    #[serde(rename = "EXECUTION_FAILED")] ExecutionFailed,
-    #[serde(rename = "EXECUTION_UNKNOWN")] ExecutionUnknown,
-    #[serde(rename = "EVIDENCE_CORRECTION")] EvidenceCorrection,
+    #[serde(rename = "REQUEST_RECEIVED")]
+    RequestReceived,
+    #[serde(rename = "DECISION_RECORDED")]
+    DecisionRecorded,
+    #[serde(rename = "APPROVAL_REQUESTED")]
+    ApprovalRequested,
+    #[serde(rename = "APPROVAL_RECORDED")]
+    ApprovalRecorded,
+    #[serde(rename = "APPROVAL_REJECTED")]
+    ApprovalRejected,
+    #[serde(rename = "POLICY_REEVALUATED")]
+    PolicyReevaluated,
+    #[serde(rename = "PERMIT_ISSUED")]
+    PermitIssued,
+    #[serde(rename = "PERMIT_CONSUMED")]
+    PermitConsumed,
+    #[serde(rename = "ENFORCEMENT_REJECTED")]
+    EnforcementRejected,
+    #[serde(rename = "EXECUTION_OBSERVED")]
+    ExecutionObserved,
+    #[serde(rename = "EXECUTION_FAILED")]
+    ExecutionFailed,
+    #[serde(rename = "EXECUTION_UNKNOWN")]
+    ExecutionUnknown,
+    #[serde(rename = "EVIDENCE_CORRECTION")]
+    EvidenceCorrection,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -36,9 +49,12 @@ pub struct ActorRefV1 {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DecisionOutcome {
-    #[serde(rename = "ALLOW")] Allow,
-    #[serde(rename = "DENY")] Deny,
-    #[serde(rename = "REQUIRE_APPROVAL")] RequireApproval,
+    #[serde(rename = "ALLOW")]
+    Allow,
+    #[serde(rename = "DENY")]
+    Deny,
+    #[serde(rename = "REQUIRE_APPROVAL")]
+    RequireApproval,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -164,7 +180,9 @@ impl std::error::Error for EvidenceError {}
 
 fn is_lower_hex_digest(value: &str) -> bool {
     value.len() == 64
-        && value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
 fn validate_draft(draft: &EvidenceEventDraftV1) -> Result<(), EvidenceError> {
@@ -172,26 +190,48 @@ fn validate_draft(draft: &EvidenceEventDraftV1) -> Result<(), EvidenceError> {
         return Err(EvidenceError::InvalidSchemaVersion);
     }
     if [
-        draft.event_id.as_str(), draft.tenant_id.as_str(), draft.stream_id.as_str(),
-        draft.request_id.as_str(), draft.actor_ref.kind.as_str(), draft.actor_ref.id.as_str(),
-    ].iter().any(|value| value.trim().is_empty()) {
+        draft.event_id.as_str(),
+        draft.tenant_id.as_str(),
+        draft.stream_id.as_str(),
+        draft.request_id.as_str(),
+        draft.actor_ref.kind.as_str(),
+        draft.actor_ref.id.as_str(),
+    ]
+    .iter()
+    .any(|value| value.trim().is_empty())
+    {
         return Err(EvidenceError::EmptyRequiredField);
     }
     if draft.sequence == 0 {
         return Err(EvidenceError::InvalidSequence);
     }
-    if !draft.occurred_at.ends_with('Z') || !draft.occurred_at.is_ascii()
-        || draft.occurred_at.len() < 20 {
+    if !draft.occurred_at.ends_with('Z')
+        || !draft.occurred_at.is_ascii()
+        || draft.occurred_at.len() < 20
+    {
         return Err(EvidenceError::InvalidTimestamp);
     }
-    for digest in [&draft.request_digest, &draft.action_digest, &draft.policy_digest]
-        .into_iter().flatten() {
+    for digest in [
+        &draft.request_digest,
+        &draft.action_digest,
+        &draft.policy_digest,
+    ]
+    .into_iter()
+    .flatten()
+    {
         if !is_lower_hex_digest(digest) {
             return Err(EvidenceError::InvalidDigest);
         }
     }
-    if draft.correction_of_event_id.as_ref().is_some_and(|id| id.trim().is_empty())
-        || draft.reason_codes.iter().any(|reason| reason.trim().is_empty()) {
+    if draft
+        .correction_of_event_id
+        .as_ref()
+        .is_some_and(|id| id.trim().is_empty())
+        || draft
+            .reason_codes
+            .iter()
+            .any(|reason| reason.trim().is_empty())
+    {
         return Err(EvidenceError::EmptyRequiredField);
     }
     Ok(())
@@ -292,7 +332,9 @@ pub fn verify_event(event: &EvidenceEventV1) -> Result<(), EvidenceError> {
 /// reordering, middle deletion, duplication, and broken links. Tail truncation
 /// and full rewrite require an independently retained signed checkpoint.
 pub fn verify_stream(events: &[EvidenceEventV1]) -> Result<(), EvidenceError> {
-    let Some(first) = events.first() else { return Ok(()); };
+    let Some(first) = events.first() else {
+        return Ok(());
+    };
     if first.sequence != 1 {
         return Err(EvidenceError::SequenceDiscontinuity);
     }
@@ -303,13 +345,17 @@ pub fn verify_stream(events: &[EvidenceEventV1]) -> Result<(), EvidenceError> {
     let stream_id = &first.stream_id;
     let mut previous_hash = GENESIS_PREVIOUS_HASH;
     for (index, event) in events.iter().enumerate() {
-        let expected_sequence = u64::try_from(index + 1)
-            .map_err(|_| EvidenceError::SequenceDiscontinuity)?;
+        let expected_sequence =
+            u64::try_from(index + 1).map_err(|_| EvidenceError::SequenceDiscontinuity)?;
         if event.sequence != expected_sequence {
             return Err(EvidenceError::SequenceDiscontinuity);
         }
-        if &event.tenant_id != tenant_id { return Err(EvidenceError::TenantMismatch); }
-        if &event.stream_id != stream_id { return Err(EvidenceError::StreamMismatch); }
+        if &event.tenant_id != tenant_id {
+            return Err(EvidenceError::TenantMismatch);
+        }
+        if &event.stream_id != stream_id {
+            return Err(EvidenceError::StreamMismatch);
+        }
         if event.previous_event_hash != previous_hash {
             return Err(EvidenceError::PreviousHashMismatch);
         }
@@ -331,13 +377,26 @@ mod tests {
             stream_id: "stream-1".to_owned(),
             sequence,
             occurred_at: "2026-11-19T00:00:00Z".to_owned(),
-            event_type: if sequence == 1 { EvidenceEventType::RequestReceived }
-                else { EvidenceEventType::DecisionRecorded },
+            event_type: if sequence == 1 {
+                EvidenceEventType::RequestReceived
+            } else {
+                EvidenceEventType::DecisionRecorded
+            },
             request_id: "request-1".to_owned(),
-            actor_ref: ActorRefV1 { kind: "service".to_owned(), id: "runtime".to_owned() },
-            request_digest: None, action_digest: None, policy_digest: None,
-            decision: if sequence == 1 { None } else { Some(DecisionOutcome::Allow) },
-            reason_codes: Vec::new(), correction_of_event_id: None,
+            actor_ref: ActorRefV1 {
+                kind: "service".to_owned(),
+                id: "runtime".to_owned(),
+            },
+            request_digest: None,
+            action_digest: None,
+            policy_digest: None,
+            decision: if sequence == 1 {
+                None
+            } else {
+                Some(DecisionOutcome::Allow)
+            },
+            reason_codes: Vec::new(),
+            correction_of_event_id: None,
         }
     }
 
@@ -365,7 +424,10 @@ mod tests {
     fn detects_payload_and_hash_tampering() {
         let mut events = two_event_stream();
         events[0].request_id = "tampered".to_owned();
-        assert_eq!(verify_stream(&events), Err(EvidenceError::EventHashMismatch));
+        assert_eq!(
+            verify_stream(&events),
+            Err(EvidenceError::EventHashMismatch)
+        );
         let mut events = two_event_stream();
         events[1].event_hash.replace_range(0..1, "f");
         assert_eq!(verify_stream(&events), Err(EvidenceError::EventHashMismatch));
@@ -375,17 +437,27 @@ mod tests {
     fn detects_predecessor_tampering() {
         let mut events = two_event_stream();
         events[1].previous_event_hash = GENESIS_PREVIOUS_HASH.to_owned();
-        assert_eq!(verify_stream(&events), Err(EvidenceError::PreviousHashMismatch));
+        assert_eq!(
+            verify_stream(&events),
+            Err(EvidenceError::PreviousHashMismatch)
+        );
     }
 
     #[test]
     fn detects_deletion_reordering_and_duplicates() {
         let events = two_event_stream();
-        assert_eq!(verify_stream(&events[1..]), Err(EvidenceError::SequenceDiscontinuity));
-        assert_eq!(verify_stream(&[events[1].clone(), events[0].clone()]),
-            Err(EvidenceError::SequenceDiscontinuity));
-        assert_eq!(verify_stream(&[events[0].clone(), events[0].clone()]),
-            Err(EvidenceError::SequenceDiscontinuity));
+        assert_eq!(
+            verify_stream(&events[1..]),
+            Err(EvidenceError::SequenceDiscontinuity)
+        );
+        assert_eq!(
+            verify_stream(&[events[1].clone(), events[0].clone()]),
+            Err(EvidenceError::SequenceDiscontinuity)
+        );
+        assert_eq!(
+            verify_stream(&[events[0].clone(), events[0].clone()]),
+            Err(EvidenceError::SequenceDiscontinuity)
+        );
     }
 
     #[test]
@@ -402,22 +474,37 @@ mod tests {
     fn rejects_malformed_hashes_and_invalid_drafts() {
         let mut event = seal_event(draft(1, "event-1"), GENESIS_PREVIOUS_HASH).unwrap();
         event.previous_event_hash = "bad".to_owned();
-        assert_eq!(verify_event(&event), Err(EvidenceError::InvalidPreviousHash));
+        assert_eq!(
+            verify_event(&event),
+            Err(EvidenceError::InvalidPreviousHash)
+        );
         let mut invalid = draft(1, "event-1");
         invalid.sequence = 0;
-        assert_eq!(seal_event(invalid, GENESIS_PREVIOUS_HASH), Err(EvidenceError::InvalidSequence));
+        assert_eq!(
+            seal_event(invalid, GENESIS_PREVIOUS_HASH),
+            Err(EvidenceError::InvalidSequence)
+        );
         let mut invalid = draft(1, "event-1");
         invalid.request_digest = Some("A".repeat(64));
-        assert_eq!(seal_event(invalid, GENESIS_PREVIOUS_HASH), Err(EvidenceError::InvalidDigest));
+        assert_eq!(
+            seal_event(invalid, GENESIS_PREVIOUS_HASH),
+            Err(EvidenceError::InvalidDigest)
+        );
     }
 
     #[test]
     fn flat_event_json_round_trips_and_rejects_unknown_fields() {
         let event = seal_event(draft(1, "event-1"), GENESIS_PREVIOUS_HASH).unwrap();
         let bytes = serde_json::to_vec(&event).unwrap();
-        assert_eq!(serde_json::from_slice::<EvidenceEventV1>(&bytes).unwrap(), event);
-        assert!(serde_json::from_slice::<EvidenceEventV1>(
-            br#"{"schema_version":"agentguard.evidence-v1","unknown":true}"#
-        ).is_err());
+        assert_eq!(
+            serde_json::from_slice::<EvidenceEventV1>(&bytes).unwrap(),
+            event
+        );
+        assert!(
+            serde_json::from_slice::<EvidenceEventV1>(
+                br#"{"schema_version":"agentguard.evidence-v1","unknown":true}"#
+            )
+            .is_err()
+        );
     }
 }
