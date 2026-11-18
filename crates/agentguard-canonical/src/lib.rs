@@ -463,6 +463,14 @@ mod tests {
             Err(CanonicalError::UnsafeInteger)
         );
         assert_eq!(
+            canonicalize_json(b"18446744073709551616"),
+            Err(CanonicalError::UnsafeInteger)
+        );
+        assert_eq!(
+            canonicalize_json(b"-18446744073709551616"),
+            Err(CanonicalError::UnsafeInteger)
+        );
+        assert_eq!(
             canonicalize_json(br#"{"amount":9007199254740991}"#).unwrap(),
             br#"{"amount":9007199254740991}"#
         );
