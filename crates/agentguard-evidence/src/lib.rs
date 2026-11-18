@@ -723,15 +723,12 @@ pub struct EvidenceAppendRequestV1 {
 fn validate_append_request(
     authenticated_tenant_id: &str,
     request: &EvidenceAppendRequestV1,
-    receipt_id: &str,
-    committed_at: &str,
-    evidence_key_id: &str,
 ) -> Result<(), EvidenceServiceError> {
     if authenticated_tenant_id.is_empty()
         || authenticated_tenant_id.trim() != authenticated_tenant_id
         || request.tenant_id != authenticated_tenant_id
         || request.event_type != EvidenceEventType::DecisionRecorded
-        || request.decision != Some(DecisionOutcome::Allow)
+        || request.decision.is_none()
         || request.request_digest.is_none()
         || request.action_digest.is_none()
         || request.policy_digest.is_none()
@@ -746,15 +743,10 @@ fn validate_append_request(
         request.request_id.as_str(),
         request.actor_ref.kind.as_str(),
         request.actor_ref.id.as_str(),
-        receipt_id,
-        evidence_key_id,
     ] {
         if value.is_empty() || value.trim() != value || value.len() > 256 {
             return Err(EvidenceServiceError::InvalidEvent);
         }
-    }
-    if !is_utc_rfc3339(committed_at) {
-        return Err(EvidenceServiceError::InvalidEvent);
     }
     Ok(())
 }
@@ -850,22 +842,19 @@ fn create_signed_receipt<K: EvidenceReceiptSigner>(
 /// # Errors
 /// Returns an error for invalid event data, storage contention/failure, read-back mismatch,
 /// canonicalization failure, or receipt signer failure.
-pub fn append_with_durable_receipt<S: EvidenceStore, K: EvidenceReceiptSigner>(
+/// Append and verify a decision event without issuing a receipt.
+///
+/// This supports DENY and REQUIRE_APPROVAL decisions, which must be durably
+/// recorded but do not authorize protected execution.
+///
+/// # Errors
+/// Returns an error for invalid event data, storage contention/failure, or read-back mismatch.
+pub fn append_event_durably<S: EvidenceStore>(
     store: &S,
     authenticated_tenant_id: &str,
-    signer: &K,
     request: &EvidenceAppendRequestV1,
-    receipt_id: &str,
-    committed_at: &str,
-    evidence_key_id: &str,
-) -> Result<EvidenceAppendResult, EvidenceServiceError> {
-    validate_append_request(
-        authenticated_tenant_id,
-        request,
-        receipt_id,
-        committed_at,
-        evidence_key_id,
-    )?;
+) -> Result<StoredEvidenceEvent, EvidenceServiceError> {
+    validate_append_request(authenticated_tenant_id, request)?;
 
     for _ in 0..8 {
         let head = store
@@ -880,7 +869,6 @@ pub fn append_with_durable_receipt<S: EvidenceStore, K: EvidenceReceiptSigner>(
         if commit.commit_id.is_empty() || commit.commit_id.trim() != commit.commit_id {
             return Err(EvidenceServiceError::Store);
         }
-
         let stored = store
             .read_event(&event.tenant_id, &event.stream_id, event.sequence)
             .map_err(|_| EvidenceServiceError::Store)?
@@ -889,30 +877,52 @@ pub fn append_with_durable_receipt<S: EvidenceStore, K: EvidenceReceiptSigner>(
         if stored.event != event || stored.commit != commit {
             return Err(EvidenceServiceError::ReadBackMismatch);
         }
-
-        let receipt = create_signed_receipt(
-            signer,
-            &event,
-            &commit,
-            receipt_id,
-            committed_at,
-            evidence_key_id,
-        )?;
-        let receipt_digest = hex_digest(&receipt.digest()?);
-        return Ok(EvidenceAppendResult {
-            event,
-            receipt,
-            receipt_digest,
-        });
+        return Ok(stored);
     }
     Err(EvidenceServiceError::Contention)
 }
 
-/// Verify a signed receipt and read back the exact durable event it references.
+/// Atomically append an ALLOW decision, verify durable read-back, then obtain a signed receipt.
 ///
 /// # Errors
-///
-/// Returns an error for invalid signatures, missing events, commit mismatch, or event-binding failure.
+/// Returns an error for invalid event data, storage contention/failure, read-back mismatch,
+/// canonicalization failure, or receipt signer failure.
+pub fn append_with_durable_receipt<S: EvidenceStore, K: EvidenceReceiptSigner>(
+    store: &S,
+    authenticated_tenant_id: &str,
+    signer: &K,
+    request: &EvidenceAppendRequestV1,
+    receipt_id: &str,
+    committed_at: &str,
+    evidence_key_id: &str,
+) -> Result<EvidenceAppendResult, EvidenceServiceError> {
+    validate_append_request(authenticated_tenant_id, request)?;
+    if request.decision != Some(DecisionOutcome::Allow)
+        || [receipt_id, evidence_key_id]
+            .iter()
+            .any(|value| value.is_empty() || value.trim() != *value || value.len() > 256)
+        || !is_utc_rfc3339(committed_at)
+    {
+        return Err(EvidenceServiceError::InvalidEvent);
+    }
+
+    let stored = append_event_durably(store, authenticated_tenant_id, request)?;
+    let receipt = create_signed_receipt(
+        signer,
+        &stored.event,
+        &stored.commit,
+        receipt_id,
+        committed_at,
+        evidence_key_id,
+    )?;
+    let receipt_digest = hex_digest(&receipt.digest()?);
+    Ok(EvidenceAppendResult {
+        event: stored.event,
+        receipt,
+        receipt_digest,
+    })
+}
+
 pub fn verify_receipt_read_back<S: EvidenceStore>(
     store: &S,
     receipt: &SignedEvidenceReceiptV1,
@@ -1192,23 +1202,11 @@ mod tests {
             correction_of_event_id: None,
         };
         assert_eq!(
-            validate_append_request(
-                "tenant-2",
-                &request,
-                "receipt-1",
-                "2026-11-19T00:00:00Z",
-                "evidence-key-1",
-            ),
+            validate_append_request("tenant-2", &request),
             Err(EvidenceServiceError::InvalidEvent)
         );
         assert_eq!(
-            validate_append_request(
-                "tenant-1",
-                &request,
-                "receipt-1",
-                "2026-11-19T00:00:00Z",
-                "evidence-key-1",
-            ),
+            validate_append_request("tenant-1", &request),
             Ok(())
         );
     }
