@@ -203,9 +203,7 @@ fn is_utc_rfc3339(value: &str) -> bool {
             return false;
         }
     }
-    let number = |start: usize, end: usize| {
-        value[start..end].parse::<u32>().ok()
-    };
+    let number = |start: usize, end: usize| value[start..end].parse::<u32>().ok();
     let (Some(year), Some(month), Some(day), Some(hour), Some(minute), Some(second)) = (
         number(0, 4),
         number(5, 7),
@@ -234,9 +232,7 @@ fn is_utc_rfc3339(value: &str) -> bool {
     suffix.len() >= 3
         && suffix[0] == b'.'
         && suffix[suffix.len() - 1] == b'Z'
-        && suffix[1..suffix.len() - 1]
-            .iter()
-            .all(u8::is_ascii_digit)
+        && suffix[1..suffix.len() - 1].iter().all(u8::is_ascii_digit)
 }
 
 fn validate_draft(draft: &EvidenceEventDraftV1) -> Result<(), EvidenceError> {
