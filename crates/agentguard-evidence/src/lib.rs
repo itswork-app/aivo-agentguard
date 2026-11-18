@@ -715,18 +715,22 @@ pub struct EvidenceAppendRequestV1 {
     pub correction_of_event_id: Option<String>,
 }
 
-/// Atomically append a decision event, verify durable read-back, then obtain a signed receipt.
+/// Atomically append a decision event under an independently authenticated tenant, verify durable read-back, then obtain a signed receipt.
 ///
 /// # Errors
 /// Returns an error for invalid event data, storage contention/failure, read-back mismatch,
 /// canonicalization failure, or receipt signer failure.
 fn validate_append_request(
+    authenticated_tenant_id: &str,
     request: &EvidenceAppendRequestV1,
     receipt_id: &str,
     committed_at: &str,
     evidence_key_id: &str,
 ) -> Result<(), EvidenceServiceError> {
-    if request.event_type != EvidenceEventType::DecisionRecorded
+    if authenticated_tenant_id.is_empty()
+        || authenticated_tenant_id.trim() != authenticated_tenant_id
+        || request.tenant_id != authenticated_tenant_id
+        || request.event_type != EvidenceEventType::DecisionRecorded
         || request.decision != Some(DecisionOutcome::Allow)
         || request.request_digest.is_none()
         || request.action_digest.is_none()
@@ -848,17 +852,24 @@ fn create_signed_receipt<K: EvidenceReceiptSigner>(
 /// canonicalization failure, or receipt signer failure.
 pub fn append_with_durable_receipt<S: EvidenceStore, K: EvidenceReceiptSigner>(
     store: &S,
+    authenticated_tenant_id: &str,
     signer: &K,
     request: &EvidenceAppendRequestV1,
     receipt_id: &str,
     committed_at: &str,
     evidence_key_id: &str,
 ) -> Result<EvidenceAppendResult, EvidenceServiceError> {
-    validate_append_request(request, receipt_id, committed_at, evidence_key_id)?;
+    validate_append_request(
+        authenticated_tenant_id,
+        request,
+        receipt_id,
+        committed_at,
+        evidence_key_id,
+    )?;
 
     for _ in 0..8 {
         let head = store
-            .read_head(&request.tenant_id, &request.stream_id)
+            .read_head(authenticated_tenant_id, &request.stream_id)
             .map_err(|_| EvidenceServiceError::Store)?;
         let event = build_append_event(request, head.as_ref())?;
         let commit = match store.append_if_head_matches(&event, head.as_ref()) {
