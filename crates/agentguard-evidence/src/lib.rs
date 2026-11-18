@@ -3,7 +3,7 @@
 //! This crate prepares and verifies evidence records. It does not provide a
 //! durable store; production adapters must implement atomic durable append.
 
-use agentguard_canonical::{DigestDomain, digest_hex};
+use agentguard_canonical::{DigestDomain, MAX_SAFE_INTEGER, digest_hex};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -252,7 +252,7 @@ fn validate_draft(draft: &EvidenceEventDraftV1) -> Result<(), EvidenceError> {
     {
         return Err(EvidenceError::EmptyRequiredField);
     }
-    if draft.sequence == 0 {
+    if draft.sequence == 0 || draft.sequence > MAX_SAFE_INTEGER {
         return Err(EvidenceError::InvalidSequence);
     }
     if !is_utc_rfc3339(&draft.occurred_at) {
@@ -617,6 +617,12 @@ mod tests {
         assert_eq!(
             seal_event(invalid, GENESIS_PREVIOUS_HASH),
             Err(EvidenceError::InvalidTimestamp)
+        );
+        let mut invalid = draft(1, "event-1");
+        invalid.sequence = MAX_SAFE_INTEGER + 1;
+        assert_eq!(
+            seal_event(invalid, GENESIS_PREVIOUS_HASH),
+            Err(EvidenceError::InvalidSequence)
         );
         let mut invalid = draft(1, "event-1");
         invalid.request_digest = Some("A".repeat(64));
