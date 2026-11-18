@@ -4,7 +4,7 @@
 //! floating-point values are forbidden and integers must be IEEE-754 safe
 //! integers. Large or exact numeric values belong in schema-defined strings.
 
-use serde::de::{self, Deserialize, Deserializer, MapAccess, SeqAccess, Visitor};
+use serde::de::{self, Deserialize, Deserializer, IgnoredAny, MapAccess, SeqAccess, Visitor};
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::fmt;
@@ -205,10 +205,70 @@ impl<'de> Visitor<'de> for StrictValueVisitor {
     }
 }
 
+fn classify_json_error(error: serde_json::Error) -> CanonicalError {
+    let message = error.to_string();
+    if message.contains("duplicate object member") {
+        CanonicalError::DuplicateKey
+    } else if message.contains("floating-point values are not allowed") {
+        CanonicalError::FloatNotAllowed
+    } else if message.contains("integer is outside the safe integer range") {
+        CanonicalError::UnsafeInteger
+    } else if message.contains("recursion limit exceeded") {
+        CanonicalError::NestingLimitExceeded
+    } else {
+        CanonicalError::InvalidJson
+    }
+}
+
+// Called only after serde_json has validated the complete JSON grammar. This
+// lexical pass preserves integer-token precision even when a token exceeds
+// serde_json's native u64/i64 representation and would otherwise visit f64.
+fn contains_unsafe_integer_token(input: &[u8]) -> bool {
+    let mut index = 0;
+    while index < input.len() {
+        match input[index] {
+            b'"' => {
+                index += 1;
+                while index < input.len() {
+                    match input[index] {
+                        b'\\' => index = (index + 2).min(input.len()),
+                        b'"' => {
+                            index += 1;
+                            break;
+                        }
+                        _ => index += 1,
+                    }
+                }
+            }
+            b'-' | b'0'..=b'9' => {
+                let start = index;
+                while index < input.len()
+                    && !matches!(input[index], b',' | b']' | b'}' | b' ' | b'\\n' | b'\\r' | b'\\t')
+                {
+                    index += 1;
+                }
+                let token = &input[start..index];
+                if !token.iter().any(|byte| matches!(byte, b'.' | b'e' | b'E')) {
+                    let digits = token.strip_prefix(b"-").unwrap_or(token);
+                    let maximum = MAX_SAFE_INTEGER.to_string();
+                    if digits.len() > maximum.len()
+                        || (digits.len() == maximum.len() && digits > maximum.as_bytes())
+                    {
+                        return true;
+                    }
+                }
+            }
+            _ => index += 1,
+        }
+    }
+    false
+}
+
 /// Parses and canonicalizes raw JSON under the `AgentGuard` v1 numeric profile.
 ///
 /// Raw bytes are required so duplicate keys can be detected before a generic
-/// map representation can discard them.
+/// map representation can discard them. A syntax-only pass precedes the strict
+/// visitor so oversized integer tokens can be classified without precision loss.
 ///
 /// # Errors
 ///
@@ -219,20 +279,17 @@ pub fn canonicalize_json(input: &[u8]) -> Result<Vec<u8>, CanonicalError> {
         return Err(CanonicalError::InputTooLarge);
     }
 
-    let value = serde_json::from_slice::<StrictValue>(input).map_err(|error| {
-        let message = error.to_string();
-        if message.contains("duplicate object member") {
-            CanonicalError::DuplicateKey
-        } else if message.contains("floating-point values are not allowed") {
-            CanonicalError::FloatNotAllowed
-        } else if message.contains("integer is outside the safe integer range") {
-            CanonicalError::UnsafeInteger
-        } else if message.contains("recursion limit exceeded") {
-            CanonicalError::NestingLimitExceeded
-        } else {
-            CanonicalError::InvalidJson
-        }
-    })?;
+    let mut syntax = serde_json::Deserializer::from_slice(input);
+    IgnoredAny::deserialize(&mut syntax)
+        .and_then(|_| syntax.end())
+        .map_err(classify_json_error)?;
+
+    if contains_unsafe_integer_token(input) {
+        return Err(CanonicalError::UnsafeInteger);
+    }
+
+    let value =
+        serde_json::from_slice::<StrictValue>(input).map_err(classify_json_error)?;
 
     let mut output = Vec::with_capacity(input.len());
     write_canonical(&value, &mut output)?;
