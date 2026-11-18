@@ -437,6 +437,42 @@ pub fn verify_stream(events: &[EvidenceEventV1]) -> Result<(), EvidenceError> {
     Ok(())
 }
 
+/// Storage boundary for append-only evidence adapters.
+///
+/// Implementations MUST make append a durable atomic conditional operation:
+/// the event must be verified, its tenant/stream key must be authenticated by
+/// the caller, its sequence must be exactly the next stream sequence, and its
+/// predecessor must equal the currently committed tail (or genesis for the
+/// first event). Concurrent writers must not both append the same sequence.
+/// Implementations MUST reject duplicate event IDs within the stream and MUST
+/// NOT expose mutation or deletion of committed events through this interface.
+///
+/// This trait specifies a contract; it does not prove that an implementation's
+/// database or deployment topology satisfies durability or linearizability.
+pub trait AppendOnlyEvidenceStore {
+    type Error;
+
+    /// Atomically commits one sealed event without changing prior records.
+    ///
+    /// # Errors
+    ///
+    /// Returns the adapter's error when validation, a concurrent append
+    /// conflict, storage durability, or the underlying transaction fails.
+    fn append(&self, event: EvidenceEventV1) -> Result<(), Self::Error>;
+
+    /// Reads the complete stream in ascending sequence order.
+    ///
+    /// # Errors
+    ///
+    /// Returns the adapter's error when the stream cannot be read completely
+    /// or the storage backend cannot establish a consistent read.
+    fn read_stream(
+        &self,
+        tenant_id: &str,
+        stream_id: &str,
+    ) -> Result<Vec<EvidenceEventV1>, Self::Error>;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
