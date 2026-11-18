@@ -897,6 +897,11 @@ pub fn append_with_durable_receipt<S: EvidenceStore, K: EvidenceReceiptSigner>(
     Err(EvidenceServiceError::Contention)
 }
 
+/// Verify a signed receipt and read back the exact durable event it references.
+///
+/// # Errors
+///
+/// Returns an error for invalid signatures, missing events, commit mismatch, or event-binding failure.
 pub fn verify_receipt_read_back<S: EvidenceStore>(
     store: &S,
     receipt: &SignedEvidenceReceiptV1,
