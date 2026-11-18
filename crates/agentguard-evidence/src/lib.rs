@@ -844,7 +844,7 @@ fn create_signed_receipt<K: EvidenceReceiptSigner>(
 /// canonicalization failure, or receipt signer failure.
 /// Append and verify a decision event without issuing a receipt.
 ///
-/// This supports DENY and REQUIRE_APPROVAL decisions, which must be durably
+/// This supports DENY and `REQUIRE_APPROVAL` decisions, which must be durably
 /// recorded but do not authorize protected execution.
 ///
 /// # Errors
@@ -923,6 +923,11 @@ pub fn append_with_durable_receipt<S: EvidenceStore, K: EvidenceReceiptSigner>(
     })
 }
 
+/// Verify a signed receipt and read back the exact durable event it references.
+///
+/// # Errors
+///
+/// Returns an error for invalid signatures, missing events, commit mismatch, or event-binding failure.
 pub fn verify_receipt_read_back<S: EvidenceStore>(
     store: &S,
     receipt: &SignedEvidenceReceiptV1,
