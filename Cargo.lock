@@ -38,8 +38,10 @@ dependencies = [
 name = "agentguard-evidence"
 version = "0.1.0"
 dependencies = [
+ "agentguard-canonical",
  "agentguard-core",
  "serde",
+ "serde_json",
  "thiserror",
 ]
 
