@@ -243,7 +243,7 @@ fn contains_unsafe_integer_token(input: &[u8]) -> bool {
             b'-' | b'0'..=b'9' => {
                 let start = index;
                 while index < input.len()
-                    && !matches!(input[index], b',' | b']' | b'}' | b' ' | b'\\n' | b'\\r' | b'\\t')
+                    && !matches!(input[index], b',' | b']' | b'}' | b' ' | b'\n' | b'\r' | b'\t')
                 {
                     index += 1;
                 }
