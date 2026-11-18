@@ -122,6 +122,10 @@ pub struct PermitConsumptionRecordV1 {
     pub challenge_digest: String,
     pub attestation_id: String,
     pub attestation_digest: String,
+    pub revocation_registry_id: String,
+    pub revocation_registry_epoch: u64,
+    pub revocation_sequence: u64,
+    pub revocation_snapshot_digest: String,
     pub request_id: String,
     pub request_digest: String,
     pub action_digest: String,
@@ -134,8 +138,10 @@ pub struct PermitConsumptionRecordV1 {
 ///
 /// Implementations MUST provide linearizable tenant-scoped uniqueness for the
 /// permit ID/nonce, challenge ID/digest, and attestation ID/digest across all
-/// enforcement nodes, and persist consumption before returning success. An
-/// in-memory map or eventually consistent cache is not a production implementation.
+/// enforcement nodes. They MUST atomically compare the supplied revocation
+/// checkpoint with the latest committed high-water mark in the same transaction
+/// as permit consumption. They MUST persist consumption before returning success.
+/// An in-memory map or eventually consistent cache is not a production implementation.
 pub trait PermitConsumptionStore: Send + Sync {
     /// Atomically consume the exact permit record once.
     ///
@@ -160,11 +166,10 @@ pub enum PermitConsumptionStoreError {
     Unavailable,
 }
 
-/// Result of successful verification and atomic permit consumption.
+/// A one-shot enforcement capability returned only after atomic permit consumption.
 ///
 /// Possessing this value does not execute an action. The caller may proceed to
 /// a separately controlled effect adapter only after receiving it.
-/// A one-shot enforcement capability returned only after atomic permit consumption.
 ///
 /// Fields are private and the type is intentionally not `Clone`; downstream
 /// effect adapters must take ownership rather than accept caller-constructed claims.
@@ -247,20 +252,6 @@ pub enum EnforcementError {
     EvidenceBindingMismatch,
 }
 
-/// Verify all G3 signatures, fresh revocation status, bindings, and expiry,
-/// then atomically consume the permit before returning a verified capability.
-///
-/// Required statuses are exact-match ACTIVE entries for the inner permit key,
-/// challenge key, outer envelope key, attestation issuer/key, policy issuer/key,
-/// and exact policy digest. RETIRED and UNKNOWN are rejected in this profile.
-/// Evidence receipt read-back and evidence-service key lookup remain a separate
-/// required integration before production enablement.
-///
-/// # Errors
-///
-/// Returns an error for any missing/untrusted key, invalid signature, stale or
-/// rolled-back revocation snapshot, non-ACTIVE required subject, invalid time,
-/// envelope mismatch, or permit replay/store failure.
 /// Trusted dependencies required to verify and consume a G3 permit.
 ///
 /// References are injected by the host; this type owns no keys or storage.
@@ -326,8 +317,9 @@ where
     )?;
 
     // Evidence read-back may take time. Re-read trusted time and revocation
-    // state immediately before the single-use consume operation so expiry or
-    // a newly published revocation cannot be hidden by the earlier snapshot.
+    // state immediately before the single-use consume operation. The store must
+    // atomically compare this checkpoint with its latest persisted high-water
+    // mark; snapshot publication not yet observed remains bounded by snapshot TTL.
     let final_now_utc = services.clock.now_utc()?;
     envelope.validate_at(&final_now_utc)?;
     let final_snapshot = verify_current_revocation(
@@ -343,7 +335,13 @@ where
         &evidence_receipt.claims.evidence_key_id,
     )?;
 
-    consume_permit(envelope, expected, services.permit_store, &final_now_utc)
+    consume_permit(
+        envelope,
+        expected,
+        services.permit_store,
+        &final_now_utc,
+        &final_snapshot,
+    )
 }
 
 struct EnvelopeVerificationKeys {
@@ -542,6 +540,7 @@ fn consume_permit<P: PermitConsumptionStore>(
     expected: &ExpectedExecutionContextV1,
     permit_store: &P,
     now_utc: &str,
+    revocation_snapshot: &SignedRevocationSnapshotV1,
 ) -> Result<ConsumedPermitV2, EnforcementError> {
     let permit = &envelope.permit_claims_v1;
     let envelope_digest = envelope
@@ -556,6 +555,9 @@ fn consume_permit<P: PermitConsumptionStore>(
     let attestation_digest = attestation
         .digest()
         .map_err(|error| PermitEnvelopeError::Canonicalization(error.to_string()))?;
+    let revocation_digest = revocation_snapshot
+        .digest()
+        .map_err(|error| PermitEnvelopeError::Canonicalization(error.to_string()))?;
     let record = PermitConsumptionRecordV1 {
         tenant_id: permit.tenant_id.clone(),
         permit_id: permit.permit_id.clone(),
@@ -564,6 +566,10 @@ fn consume_permit<P: PermitConsumptionStore>(
         challenge_digest: agentguard_core::hex_digest(&challenge_digest),
         attestation_id: attestation.claims.attestation_id.clone(),
         attestation_digest: agentguard_core::hex_digest(&attestation_digest),
+        revocation_registry_id: revocation_snapshot.claims.registry_id.clone(),
+        revocation_registry_epoch: revocation_snapshot.claims.registry_epoch,
+        revocation_sequence: revocation_snapshot.claims.sequence,
+        revocation_snapshot_digest: agentguard_core::hex_digest(&revocation_digest),
         request_id: permit.request_id.clone(),
         request_digest: expected.request_digest.clone(),
         action_digest: permit.action_digest.clone(),
