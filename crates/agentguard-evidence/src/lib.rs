@@ -126,6 +126,8 @@ pub struct EvidenceEventV1 {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub policy_digest: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub context_digest: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub decision: Option<DecisionOutcome>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub reason_codes: Vec<String>,
