@@ -185,6 +185,60 @@ fn is_lower_hex_digest(value: &str) -> bool {
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
+fn is_utc_rfc3339(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    if bytes.len() < 20 || !value.is_ascii() {
+        return false;
+    }
+    if bytes[4] != b'-'
+        || bytes[7] != b'-'
+        || bytes[10] != b'T'
+        || bytes[13] != b':'
+        || bytes[16] != b':'
+    {
+        return false;
+    }
+    for (start, end) in [(0, 4), (5, 7), (8, 10), (11, 13), (14, 16), (17, 19)] {
+        if !bytes[start..end].iter().all(u8::is_ascii_digit) {
+            return false;
+        }
+    }
+    let number = |start: usize, end: usize| {
+        value[start..end].parse::<u32>().ok()
+    };
+    let (Some(year), Some(month), Some(day), Some(hour), Some(minute), Some(second)) = (
+        number(0, 4),
+        number(5, 7),
+        number(8, 10),
+        number(11, 13),
+        number(14, 16),
+        number(17, 19),
+    ) else {
+        return false;
+    };
+    let leap_year = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+    let days_in_month = match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if leap_year => 29,
+        2 => 28,
+        _ => return false,
+    };
+    if day == 0 || day > days_in_month || hour > 23 || minute > 59 || second > 60 {
+        return false;
+    }
+    let suffix = &bytes[19..];
+    if suffix == b"Z" {
+        return true;
+    }
+    suffix.len() >= 3
+        && suffix[0] == b'.'
+        && suffix[suffix.len() - 1] == b'Z'
+        && suffix[1..suffix.len() - 1]
+            .iter()
+            .all(u8::is_ascii_digit)
+}
+
 fn validate_draft(draft: &EvidenceEventDraftV1) -> Result<(), EvidenceError> {
     if draft.schema_version != "agentguard.evidence-v1" {
         return Err(EvidenceError::InvalidSchemaVersion);
@@ -205,10 +259,7 @@ fn validate_draft(draft: &EvidenceEventDraftV1) -> Result<(), EvidenceError> {
     if draft.sequence == 0 {
         return Err(EvidenceError::InvalidSequence);
     }
-    if !draft.occurred_at.ends_with('Z')
-        || !draft.occurred_at.is_ascii()
-        || draft.occurred_at.len() < 20
-    {
+    if !is_utc_rfc3339(&draft.occurred_at) {
         return Err(EvidenceError::InvalidTimestamp);
     }
     for digest in [
@@ -418,6 +469,10 @@ mod tests {
         let first = seal_event(draft(1, "event-1"), GENESIS_PREVIOUS_HASH).unwrap();
         let second = seal_event(draft(1, "event-1"), GENESIS_PREVIOUS_HASH).unwrap();
         assert_eq!(first.event_hash, second.event_hash);
+        assert_eq!(
+            first.event_hash,
+            "b87836865744006e46c8e3911d7b3f35ce188e6f38aa9df82c559edba22e12a8"
+        );
     }
 
     #[test]
@@ -430,7 +485,10 @@ mod tests {
         );
         let mut events = two_event_stream();
         events[1].event_hash.replace_range(0..1, "f");
-        assert_eq!(verify_stream(&events), Err(EvidenceError::EventHashMismatch));
+        assert_eq!(
+            verify_stream(&events),
+            Err(EvidenceError::EventHashMismatch)
+        );
     }
 
     #[test]
@@ -483,6 +541,12 @@ mod tests {
         assert_eq!(
             seal_event(invalid, GENESIS_PREVIOUS_HASH),
             Err(EvidenceError::InvalidSequence)
+        );
+        let mut invalid = draft(1, "event-1");
+        invalid.occurred_at = "2026-99-99T99:99:99Z".to_owned();
+        assert_eq!(
+            seal_event(invalid, GENESIS_PREVIOUS_HASH),
+            Err(EvidenceError::InvalidTimestamp)
         );
         let mut invalid = draft(1, "event-1");
         invalid.request_digest = Some("A".repeat(64));
