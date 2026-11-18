@@ -498,6 +498,26 @@ mod tests {
     }
 
     #[test]
+    fn classifies_integers_beyond_f64_range_without_accepting_malformed_json() {
+        let huge_positive = format!("{}1", "9".repeat(400));
+        let huge_negative = format!("-{}1", "9".repeat(400));
+        assert_eq!(
+            canonicalize_json(huge_positive.as_bytes()),
+            Err(CanonicalError::UnsafeInteger)
+        );
+        assert_eq!(
+            canonicalize_json(huge_negative.as_bytes()),
+            Err(CanonicalError::UnsafeInteger)
+        );
+
+        let malformed = format!("{}1:", "9".repeat(400));
+        assert_eq!(
+            canonicalize_json(malformed.as_bytes()),
+            Err(CanonicalError::InvalidJson)
+        );
+    }
+
+    #[test]
     fn rejects_invalid_utf8_and_lone_surrogates() {
         assert_eq!(
             canonicalize_json(&[b'"', 0xff, b'"']),
