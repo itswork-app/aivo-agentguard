@@ -11,7 +11,7 @@ use agentguard_core::{
     SignedRevocationSnapshotV1, persist_verified_snapshot,
 };
 use agentguard_evidence::{
-    EvidenceEventType, EvidenceStore, SignedEvidenceReceiptV1, verify_receipt_read_back,
+    DecisionOutcome, EvidenceEventType, EvidenceStore, SignedEvidenceReceiptV1, verify_receipt_read_back,
 };
 use serde::{Deserialize, Serialize};
 
@@ -482,7 +482,7 @@ where
         || event.action_digest.as_deref() != Some(attestation.action_digest.as_str())
         || event.policy_digest.as_deref() != Some(attestation.policy_digest.as_str())
         || event.context_digest.as_deref() != Some(attestation.context_digest.as_str())
-        || event.decision.as_deref() != Some("ALLOW")
+        || event.decision != Some(DecisionOutcome::Allow)
     {
         return Err(EnforcementError::EvidenceBindingMismatch);
     }
