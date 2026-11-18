@@ -177,25 +177,39 @@ pub struct ConsumedPermitV2 {
 
 impl ConsumedPermitV2 {
     #[must_use]
-    pub fn tenant_id(&self) -> &str { &self.tenant_id }
+    pub fn tenant_id(&self) -> &str {
+        &self.tenant_id
+    }
 
     #[must_use]
-    pub fn permit_id(&self) -> &str { &self.permit_id }
+    pub fn permit_id(&self) -> &str {
+        &self.permit_id
+    }
 
     #[must_use]
-    pub fn request_id(&self) -> &str { &self.request_id }
+    pub fn request_id(&self) -> &str {
+        &self.request_id
+    }
 
     #[must_use]
-    pub fn action_digest(&self) -> &str { &self.action_digest }
+    pub fn action_digest(&self) -> &str {
+        &self.action_digest
+    }
 
     #[must_use]
-    pub fn policy_digest(&self) -> &str { &self.policy_digest }
+    pub fn policy_digest(&self) -> &str {
+        &self.policy_digest
+    }
 
     #[must_use]
-    pub fn envelope_digest(&self) -> &str { &self.envelope_digest }
+    pub fn envelope_digest(&self) -> &str {
+        &self.envelope_digest
+    }
 
     #[must_use]
-    pub fn expires_at(&self) -> &str { &self.expires_at }
+    pub fn expires_at(&self) -> &str {
+        &self.expires_at
+    }
 }
 
 /// Fail-closed errors raised by the enforcement boundary.
