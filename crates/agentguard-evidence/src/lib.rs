@@ -1205,10 +1205,7 @@ mod tests {
             validate_append_request("tenant-2", &request),
             Err(EvidenceServiceError::InvalidEvent)
         );
-        assert_eq!(
-            validate_append_request("tenant-1", &request),
-            Ok(())
-        );
+        assert_eq!(validate_append_request("tenant-1", &request), Ok(()));
     }
 
     #[test]
