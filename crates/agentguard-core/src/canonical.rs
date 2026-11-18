@@ -9,8 +9,8 @@ pub type CanonicalizationError = agentguard_canonical::CanonicalError;
 /// Serialize typed protocol claims and canonicalize them with the shared
 /// AgentGuard v1 profile. Protocol structs must reject unknown fields.
 pub fn canonical_json<T: Serialize>(value: &T) -> Result<Vec<u8>, CanonicalizationError> {
-    let encoded = serde_json::to_vec(value)
-        .map_err(|_| CanonicalizationError::SerializationFailure)?;
+    let encoded =
+        serde_json::to_vec(value).map_err(|_| CanonicalizationError::SerializationFailure)?;
     agentguard_canonical::canonicalize_json(&encoded)
 }
 
