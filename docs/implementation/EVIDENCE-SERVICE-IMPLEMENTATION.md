@@ -13,6 +13,7 @@ The G3 service extends the G4.3 evidence implementation; it does not replace the
 - Tenant/stream head read port, keyed by an authenticated tenant ID supplied separately from the event request.
 - Append orchestration rejects any event tenant that differs from the authenticated tenant context.
 - Conditional append port requiring the expected head to match atomically.
+- Durable append API for ALLOW, DENY, and REQUIRE_APPROVAL decision events; signed receipts are restricted to ALLOW decisions.
 - Durable commit identity returned by successful append.
 - Exact event read-back before receipt signing.
 - Dedicated evidence-purpose receipt signer port.
@@ -22,14 +23,14 @@ The G3 service extends the G4.3 evidence implementation; it does not replace the
 
 ## Append and receipt sequence
 
-1. Validate the decision event request and required digests.
+1. Validate the decision event request, authenticated tenant binding, and required digests.
 2. Read the authenticated tenant/stream head.
 3. Assign the next sequence and predecessor hash.
 4. Seal the event using the existing G4.3 EVENT hash primitive.
 5. Atomically append only if the expected head still matches.
 6. Read the committed event back and verify its hash and commit identity.
-7. Canonicalize receipt claims and request a signature from the dedicated evidence-purpose signer.
-8. Return the event and receipt only after all checks succeed.
+7. For ALLOW only, canonicalize receipt claims and request a signature from the dedicated evidence-purpose signer.
+8. Return the event and receipt only after all checks succeed. DENY and REQUIRE_APPROVAL are durably appended and returned without an execution receipt.
 
 If signing fails after the durable append, the committed event remains an immutable fact. The service does not attempt rollback or deletion. The current interface does not yet expose a dedicated receipt-recovery-by-event-ID operation; adapter-level reconciliation is a production gate, not an already implemented retry guarantee.
 
