@@ -1,15 +1,84 @@
-//! Shared domain types for AIVO `AgentGuard`.
+//! Shared domain types and cryptographic protocol primitives for this product.
 //!
-//! This crate is scaffolding. Public contracts are provisional until their
-//! corresponding specifications are approved.
+//! This crate contains deterministic, side-effect-free primitives. It does not
+//! hold signing keys, perform authorization orchestration, or execute actions.
 
-/// Authorization outcomes at the policy boundary.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Decision {
-    /// The policy permits the exact action under the evaluated context.
-    Allow,
-    /// The policy prohibits the action or a required trust condition failed.
-    Deny,
-    /// A separate approval workflow is required; this is not execution permission.
-    RequireApproval,
+mod canonical;
+mod crypto;
+mod permit;
+mod protocol;
+mod provenance;
+mod revocation;
+
+pub use canonical::{CanonicalizationError, canonical_json, domain_digest, hex_digest};
+pub use crypto::{CryptoError, verify_ed25519};
+pub use permit::{
+    AttestationBindingV1, AuthorizationPermitV1, PermitEnvelopeError, PermitEnvelopeV2,
+    PolicyProvenanceV1,
+};
+pub use protocol::{
+    AttestationVerificationError, AuthorizationAttestationV1, ChallengeConsumptionError,
+    ChallengeConsumptionV1, ChallengeReplayStore, ChallengeReplayStoreError,
+    ChallengeVerificationError, Decision, DecisionEventRef, EvidenceReceiptRef, KeyPurpose,
+    ProtocolShapeError, SignatureAlgorithm, SignatureEnvelope, SignedAuthorizationAttestationV1,
+    SignedSigningChallengeV1, SigningChallengeV1, consume_attested_challenge,
+};
+pub use provenance::{
+    DsseEnvelopeV1, DsseSignatureV1, EvaluatorReleaseManifestV1, InTotoStatementV1,
+    InTotoSubjectV1, ProvenanceError, SlsaBuildDefinitionV1, SlsaBuilderV1,
+    SlsaProvenancePredicateV1, SlsaResolvedDependencyV1, SlsaRunDetailsV1, SlsaRunMetadataV1,
+    VerifiedEvaluatorArtifactV1, verify_evaluator_provenance,
+};
+pub use revocation::{
+    RevocationEntryV1, RevocationError, RevocationHighWaterMark, RevocationHighWaterMarkStore,
+    RevocationPersistenceError, RevocationSnapshotV1, RevocationStatus, RevocationStoreError,
+    RevocationSubjectType, SignedRevocationSnapshotV1, persist_verified_snapshot,
+    validate_progression,
+};
+
+#[cfg(test)]
+mod tests {
+    use crate::{canonical_json, domain_digest, hex_digest};
+    use serde::Serialize;
+
+    #[derive(Serialize)]
+    struct ReorderedA {
+        z: u64,
+        a: &'static str,
+    }
+
+    #[derive(Serialize)]
+    struct ReorderedB {
+        a: &'static str,
+        z: u64,
+    }
+
+    #[test]
+    fn canonical_json_is_independent_of_struct_field_order() {
+        let a = canonical_json(&ReorderedA { z: 7, a: "agent" }).unwrap();
+        let b = canonical_json(&ReorderedB { a: "agent", z: 7 }).unwrap();
+        assert_eq!(a, b);
+        assert_eq!(a, br#"{"a":"agent","z":7}"#);
+    }
+
+    #[test]
+    fn domain_digest_includes_exact_nul_terminated_domain() {
+        let payload = br#"{"action":"transfer"}"#;
+        let a = domain_digest(b"AIVO-AGENTGUARD-ACTION-V1\0", payload);
+        let b = domain_digest(b"AIVO-AGENTGUARD-REQUEST-V1\0", payload);
+        assert_ne!(a, b);
+        assert_eq!(
+            hex_digest(&a),
+            "2067ea88cc6825da0bf23d7586b49b1f8eb46ae7c7e8cb06803f68b0cbb052ca"
+        );
+    }
+
+    #[test]
+    fn domain_separator_without_nul_is_not_equivalent() {
+        let payload = b"payload";
+        assert_ne!(
+            domain_digest(b"AIVO-AGENTGUARD-ACTION-V1\0", payload),
+            domain_digest(b"AIVO-AGENTGUARD-ACTION-V1", payload)
+        );
+    }
 }

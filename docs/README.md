@@ -42,6 +42,7 @@
 - `adr/ADR-0007-permit-consumption.md`: tenant-scoped, linearizable single-use permit consumption.
 - `adr/ADR-0008-authorization-attestation.md`: independent authorization-attestation issuer.
 - `adr/ADR-0009-permit-envelope-and-revocation.md`: v2 permit envelope and signed revocation snapshots.
+- `adr/ADR-0010-authorization-proof-replay-and-revocation-checkpoint.md`: proposed one-time challenge/attestation consumption and atomic revocation-checkpoint binding.
 - `testing/G3-ACCEPTANCE-TEST-PLAN.md`: negative, replay, revocation, and enforcement test requirements.
 - `testing/G3-TRACEABILITY.md`: G3 requirements mapped to acceptance tests.
 - `testing/ACCEPTANCE-TEST-PLAN.md`: offline contract and adversarial test matrix.

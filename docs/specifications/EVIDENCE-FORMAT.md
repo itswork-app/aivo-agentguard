@@ -22,13 +22,14 @@ Each event contains:
 - `request_digest` (when applicable)
 - `action_digest` (when applicable)
 - `policy_digest` (when applicable)
+- `context_digest` (optional; included when the authorization context is part of the recorded decision)
 - `decision` and stable reason codes (when applicable)
 - `previous_event_hash`
 - `event_hash`
 
 ## 3. Hash construction
 
-The canonical event payload excludes `event_hash` and transport/storage metadata. The first event in a stream uses a fixed all-zero previous hash. Each subsequent event includes the prior event hash. Compute:
+The canonical event payload excludes `event_hash` and transport/storage metadata. The optional `context_digest` field is omitted from canonical payloads when absent, preserving existing v1 event hashes. The first event in a stream uses a fixed all-zero previous hash. Each subsequent event includes the prior event hash. Compute:
 
 `event_hash = SHA-256(domain_separator || canonical_event_payload)`
 

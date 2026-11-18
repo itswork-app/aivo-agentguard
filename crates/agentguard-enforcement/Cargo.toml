@@ -8,7 +8,9 @@ repository.workspace = true
 
 [dependencies]
 agentguard-core = { path = "../agentguard-core" }
-agentguard-runtime = { path = "../agentguard-runtime" }
+agentguard-evidence = { path = "../agentguard-evidence" }
+serde = { version = "1", features = ["derive"] }
+thiserror = "2"
 
 [lib]
 path = "src/lib.rs"
