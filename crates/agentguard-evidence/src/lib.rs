@@ -1162,6 +1162,49 @@ mod tests {
     }
 
     #[test]
+    fn durable_append_rejects_tenant_not_bound_to_authenticated_context() {
+        let request = EvidenceAppendRequestV1 {
+            event_id: "event-1".to_owned(),
+            tenant_id: "tenant-1".to_owned(),
+            stream_id: "stream-1".to_owned(),
+            occurred_at: "2026-11-19T00:00:00Z".to_owned(),
+            event_type: EvidenceEventType::DecisionRecorded,
+            request_id: "request-1".to_owned(),
+            actor_ref: ActorRefV1 {
+                kind: "service".to_owned(),
+                id: "runtime".to_owned(),
+            },
+            request_digest: Some("a".repeat(64)),
+            action_digest: Some("b".repeat(64)),
+            policy_digest: Some("c".repeat(64)),
+            context_digest: Some("d".repeat(64)),
+            decision: Some(DecisionOutcome::Allow),
+            reason_codes: Vec::new(),
+            correction_of_event_id: None,
+        };
+        assert_eq!(
+            validate_append_request(
+                "tenant-2",
+                &request,
+                "receipt-1",
+                "2026-11-19T00:00:00Z",
+                "evidence-key-1",
+            ),
+            Err(EvidenceServiceError::InvalidEvent)
+        );
+        assert_eq!(
+            validate_append_request(
+                "tenant-1",
+                &request,
+                "receipt-1",
+                "2026-11-19T00:00:00Z",
+                "evidence-key-1",
+            ),
+            Ok(())
+        );
+    }
+
+    #[test]
     fn flat_event_json_round_trips_and_rejects_unknown_fields() {
         let event = seal_event(draft(1, "event-1"), GENESIS_PREVIOUS_HASH).unwrap();
         let bytes = serde_json::to_vec(&event).unwrap();
