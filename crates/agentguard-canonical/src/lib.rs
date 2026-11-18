@@ -493,10 +493,18 @@ mod tests {
             Err(CanonicalError::InputTooLarge)
         );
 
-        let at_limit = format!("{}null{}", "[".repeat(MAX_NESTING_DEPTH), "]".repeat(MAX_NESTING_DEPTH));
+        let at_limit = format!(
+            "{}null{}",
+            "[".repeat(MAX_NESTING_DEPTH),
+            "]".repeat(MAX_NESTING_DEPTH)
+        );
         assert!(canonicalize_json(at_limit.as_bytes()).is_ok());
 
-        let over_limit = format!("{}null{}", "[".repeat(MAX_NESTING_DEPTH + 1), "]".repeat(MAX_NESTING_DEPTH + 1));
+        let over_limit = format!(
+            "{}null{}",
+            "[".repeat(MAX_NESTING_DEPTH + 1),
+            "]".repeat(MAX_NESTING_DEPTH + 1)
+        );
         assert_eq!(
             canonicalize_json(over_limit.as_bytes()),
             Err(CanonicalError::NestingLimitExceeded)
