@@ -972,6 +972,21 @@ mod tests {
     }
 
     #[test]
+    fn optional_context_digest_preserves_legacy_hash_and_binds_when_present() {
+        let absent = seal_event(draft(1, "event-1"), GENESIS_PREVIOUS_HASH).unwrap();
+        assert_eq!(
+            absent.event_hash,
+            "b87836865744006e46c8e3911d7b3f35ce188e6f38aa9df82c559edba22e12a8"
+        );
+
+        let mut with_context = draft(1, "event-1");
+        with_context.context_digest = Some("a".repeat(64));
+        let bound = seal_event(with_context, GENESIS_PREVIOUS_HASH).unwrap();
+        assert_ne!(absent.event_hash, bound.event_hash);
+        assert_eq!(verify_event(&bound), Ok(()));
+    }
+
+    #[test]
     fn detects_payload_and_hash_tampering() {
         let mut events = two_event_stream();
         events[0].request_id = "tampered".to_owned();
