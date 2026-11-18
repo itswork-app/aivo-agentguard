@@ -118,6 +118,10 @@ pub struct PermitConsumptionRecordV1 {
     pub tenant_id: String,
     pub permit_id: String,
     pub permit_nonce: String,
+    pub challenge_id: String,
+    pub challenge_digest: String,
+    pub attestation_id: String,
+    pub attestation_digest: String,
     pub request_id: String,
     pub request_digest: String,
     pub action_digest: String,
@@ -128,9 +132,10 @@ pub struct PermitConsumptionRecordV1 {
 
 /// Durable, atomic, tenant-scoped single-use permit consumption contract.
 ///
-/// Implementations MUST provide linearizable uniqueness across all enforcement
-/// nodes and persist consumption before returning success. An in-memory map or
-/// eventually consistent cache is not a production implementation.
+/// Implementations MUST provide linearizable tenant-scoped uniqueness for the
+/// permit ID/nonce, challenge ID/digest, and attestation ID/digest across all
+/// enforcement nodes, and persist consumption before returning success. An
+/// in-memory map or eventually consistent cache is not a production implementation.
 pub trait PermitConsumptionStore: Send + Sync {
     /// Atomically consume the exact permit record once.
     ///
@@ -543,10 +548,22 @@ fn consume_permit<P: PermitConsumptionStore>(
         .digest()
         .map_err(|error| PermitEnvelopeError::Canonicalization(error.to_string()))?;
     let envelope_digest = agentguard_core::hex_digest(&envelope_digest);
+    let challenge = &envelope.signing_challenge_v1;
+    let challenge_digest = challenge
+        .digest()
+        .map_err(|error| PermitEnvelopeError::Canonicalization(error.to_string()))?;
+    let attestation = &envelope.authorization_attestation_v1;
+    let attestation_digest = attestation
+        .digest()
+        .map_err(|error| PermitEnvelopeError::Canonicalization(error.to_string()))?;
     let record = PermitConsumptionRecordV1 {
         tenant_id: permit.tenant_id.clone(),
         permit_id: permit.permit_id.clone(),
         permit_nonce: permit.nonce.clone(),
+        challenge_id: challenge.claims.challenge_id.clone(),
+        challenge_digest: agentguard_core::hex_digest(&challenge_digest),
+        attestation_id: attestation.claims.attestation_id.clone(),
+        attestation_digest: agentguard_core::hex_digest(&attestation_digest),
         request_id: permit.request_id.clone(),
         request_digest: expected.request_digest.clone(),
         action_digest: permit.action_digest.clone(),
