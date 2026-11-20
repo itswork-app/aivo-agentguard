@@ -70,10 +70,10 @@ fn postgres_append_is_atomic_idempotent_and_tenant_scoped() {
         .expect("tenant-scoped read");
     assert!(other_tenant.is_empty());
 
-    let reused_id = seal_event(
-        draft(&tenant, &stream, 1, "event-1"),
-        GENESIS_PREVIOUS_HASH,
-    ).expect("seal conflicting payload");
+    let mut conflicting_draft = draft(&tenant, &stream, 1, "event-1");
+    conflicting_draft.reason_codes.push("tampered".to_owned());
+    let reused_id = seal_event(conflicting_draft, GENESIS_PREVIOUS_HASH)
+        .expect("seal conflicting payload");
     // Same event identity with different canonical bytes must never be accepted.
     assert!(store.append(reused_id).is_err());
 
