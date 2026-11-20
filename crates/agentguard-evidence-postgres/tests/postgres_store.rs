@@ -4,10 +4,21 @@ use agentguard_evidence::{
 };
 use agentguard_evidence_postgres::PostgresEvidenceStore;
 use postgres::{Client, NoTls};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::{sync::OnceLock, time::{SystemTime, UNIX_EPOCH}};
+
+static MIGRATION: OnceLock<()> = OnceLock::new();
 
 fn database_url() -> Option<String> {
     std::env::var("DATABASE_URL").ok()
+}
+
+fn apply_migration_once(url: &str) {
+    MIGRATION.get_or_init(|| {
+        let mut client = Client::connect(url, NoTls).expect("connect migration client");
+        client
+            .batch_execute(include_str!("../migrations/0001_evidence_store.sql"))
+            .expect("apply migration");
+    });
 }
 
 fn unique_id(prefix: &str) -> String {
@@ -55,10 +66,7 @@ fn postgres_append_is_atomic_idempotent_and_tenant_scoped() {
         eprintln!("DATABASE_URL not set; PostgreSQL integration test skipped");
         return;
     };
-    let mut migration_client = Client::connect(&url, NoTls).expect("connect migration client");
-    migration_client
-        .batch_execute(include_str!("../migrations/0001_evidence_store.sql"))
-        .expect("apply migration");
+    apply_migration_once(&url);
 
     let tenant = unique_id("tenant");
     let stream = unique_id("stream");
@@ -149,10 +157,7 @@ fn postgres_serializes_concurrent_writers_across_connections() {
         eprintln!("DATABASE_URL not set; PostgreSQL integration test skipped");
         return;
     };
-    let mut migration_client = Client::connect(&url, NoTls).expect("connect migration client");
-    migration_client
-        .batch_execute(include_str!("../migrations/0001_evidence_store.sql"))
-        .expect("apply migration");
+    apply_migration_once(&url);
 
     let tenant = unique_id("tenant-concurrent");
     let stream = unique_id("stream-concurrent");
