@@ -90,8 +90,8 @@ impl PostgresEvidenceStore {
 
     /// Constructs a tenant-scoped store from a TLS-configured PostgreSQL client.
     ///
-    /// # Panics
-    /// Does not panic.
+    /// # Errors
+    /// Returns an error when the authenticated tenant scope is empty.
     #[must_use]
     pub fn from_client(
         client: Client,
