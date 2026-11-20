@@ -119,3 +119,59 @@ fn postgres_append_is_atomic_idempotent_and_tenant_scoped() {
         "read must detect indexed-column and sealed-payload disagreement"
     );
 }
+
+#[test]
+fn postgres_serializes_concurrent_writers_across_connections() {
+    let Some(url) = database_url() else {
+        eprintln!("DATABASE_URL not set; PostgreSQL integration test skipped");
+        return;
+    };
+    let mut migration_client = Client::connect(&url, NoTls).expect("connect migration client");
+    migration_client
+        .batch_execute(include_str!("../migrations/0001_evidence_store.sql"))
+        .expect("apply migration");
+
+    let tenant = unique_id("tenant-concurrent");
+    let stream = unique_id("stream-concurrent");
+    let store_a = PostgresEvidenceStore::connect(&url, &tenant).expect("connect writer A");
+    let store_b = PostgresEvidenceStore::connect(&url, &tenant).expect("connect writer B");
+
+    let event_a = seal_event(
+        draft(&tenant, &stream, 1, "concurrent-event-a"),
+        GENESIS_PREVIOUS_HASH,
+    )
+    .expect("seal concurrent event A");
+    let event_b = seal_event(
+        draft(&tenant, &stream, 1, "concurrent-event-b"),
+        GENESIS_PREVIOUS_HASH,
+    )
+    .expect("seal concurrent event B");
+
+    let writer_a = std::thread::spawn(move || store_a.append(event_a));
+    let writer_b = std::thread::spawn(move || store_b.append(event_b));
+    let result_a = writer_a.join().expect("writer A thread");
+    let result_b = writer_b.join().expect("writer B thread");
+
+    assert_ne!(
+        result_a.is_ok(),
+        result_b.is_ok(),
+        "exactly one competing first append may commit"
+    );
+
+    let reader = PostgresEvidenceStore::connect(&url, &tenant).expect("connect reader");
+    let events = reader
+        .read_stream(&tenant, &stream)
+        .expect("read concurrently written stream");
+    assert_eq!(events.len(), 1, "the stream must contain one committed event");
+
+    reader
+        .append(events[0].clone())
+        .expect("retry of the committed event must be idempotent");
+    assert_eq!(
+        reader
+            .read_stream(&tenant, &stream)
+            .expect("read after idempotent retry")
+            .len(),
+        1
+    );
+}
