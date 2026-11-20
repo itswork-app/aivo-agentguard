@@ -104,6 +104,20 @@ fn postgres_append_is_atomic_idempotent_and_tenant_scoped() {
         .expect("seal sequence gap");
     assert!(store.append(gap).is_err());
 
+    // A corrupted stream head must not make an old exact retry look committed.
+    migration_client
+        .execute(
+            "UPDATE agentguard_evidence_stream_heads
+             SET last_sequence = 0, last_event_hash = $1
+             WHERE tenant_id = $2 AND stream_id = $3",
+            &[&GENESIS_PREVIOUS_HASH, &tenant, &stream],
+        )
+        .expect("tamper stream head");
+    assert!(
+        store.append(first.clone()).is_err(),
+        "idempotent retry must reject a stream head behind the stored event"
+    );
+
     let tampered_hash = "f".repeat(64);
     let first_event_id = "event-1".to_owned();
     migration_client
