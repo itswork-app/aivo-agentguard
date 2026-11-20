@@ -117,6 +117,8 @@ impl PostgresEvidenceStore {
         transaction: &mut postgres::Transaction<'_>,
         event: &EvidenceEventV1,
         payload: &[u8],
+        head_sequence: i64,
+        head_hash: &str,
     ) -> Result<bool, PostgresEvidenceStoreError> {
         let Some(existing) = transaction.query_opt(
             "SELECT sequence, previous_event_hash, event_hash, payload_bytes
@@ -140,6 +142,13 @@ impl PostgresEvidenceStore {
             || stored_event.event_id != event.event_id
             || stored_event.previous_event_hash != stored_previous_hash
             || stored_event.event_hash != stored_event_hash
+        {
+            return Err(PostgresEvidenceStoreError::CorruptStoredEvent);
+        }
+        let event_sequence = i64::try_from(stored_event.sequence)
+            .map_err(|_| PostgresEvidenceStoreError::CorruptStoredEvent)?;
+        if event_sequence > head_sequence
+            || (event_sequence == head_sequence && stored_event.event_hash != head_hash)
         {
             return Err(PostgresEvidenceStoreError::CorruptStoredEvent);
         }
@@ -187,7 +196,13 @@ impl AppendOnlyEvidenceStore for PostgresEvidenceStore {
         let last_hash: String = head.get(1);
 
         // Exact retries are idempotent; a reused ID with different bytes is a conflict.
-        if Self::verify_existing_event(&mut transaction, &event, &payload)? {
+        if Self::verify_existing_event(
+            &mut transaction,
+            &event,
+            &payload,
+            last_sequence,
+            &last_hash,
+        )? {
             transaction.commit()?;
             return Ok(());
         }
