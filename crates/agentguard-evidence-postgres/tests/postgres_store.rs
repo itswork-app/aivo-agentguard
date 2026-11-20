@@ -11,7 +11,9 @@ fn database_url() -> Option<String> {
 }
 
 fn unique_id(prefix: &str) -> String {
-    let nanos = SystemTime::now().duration_since(UNIX_EPOCH).expect("clock")
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("clock")
         .as_nanos();
     format!("{prefix}-{nanos}")
 }
@@ -30,11 +32,18 @@ fn draft(tenant: &str, stream: &str, sequence: u64, event_id: &str) -> EvidenceE
             EvidenceEventType::DecisionRecorded
         },
         request_id: "request-integration".to_owned(),
-        actor_ref: ActorRefV1 { kind: "service".to_owned(), id: "integration-test".to_owned() },
+        actor_ref: ActorRefV1 {
+            kind: "service".to_owned(),
+            id: "integration-test".to_owned(),
+        },
         request_digest: None,
         action_digest: None,
         policy_digest: None,
-        decision: if sequence == 1 { None } else { Some(DecisionOutcome::Deny) },
+        decision: if sequence == 1 {
+            None
+        } else {
+            Some(DecisionOutcome::Deny)
+        },
         reason_codes: Vec::new(),
         correction_of_event_id: None,
     }
@@ -47,7 +56,8 @@ fn postgres_append_is_atomic_idempotent_and_tenant_scoped() {
         return;
     };
     let mut migration_client = Client::connect(&url, NoTls).expect("connect migration client");
-    migration_client.batch_execute(include_str!("../migrations/0001_evidence_store.sql"))
+    migration_client
+        .batch_execute(include_str!("../migrations/0001_evidence_store.sql"))
         .expect("apply migration");
 
     let tenant = unique_id("tenant");
@@ -57,7 +67,9 @@ fn postgres_append_is_atomic_idempotent_and_tenant_scoped() {
     let first = seal_event(draft(&tenant, &stream, 1, "event-1"), GENESIS_PREVIOUS_HASH)
         .expect("seal first event");
     store.append(first.clone()).expect("append first event");
-    store.append(first.clone()).expect("exact retry must be idempotent");
+    store
+        .append(first.clone())
+        .expect("exact retry must be idempotent");
 
     let second = seal_event(draft(&tenant, &stream, 2, "event-2"), &first.event_hash)
         .expect("seal second event");
@@ -66,23 +78,27 @@ fn postgres_append_is_atomic_idempotent_and_tenant_scoped() {
     let events = store.read_stream(&tenant, &stream).expect("read stream");
     assert_eq!(events, vec![first.clone(), second.clone()]);
 
-    assert!(store.read_stream(&unique_id("other-tenant"), &stream).is_err());
+    assert!(store
+        .read_stream(&unique_id("other-tenant"), &stream)
+        .is_err());
     let other_tenant_id = unique_id("other-tenant");
     let other_store = PostgresEvidenceStore::connect(&url, &other_tenant_id)
         .expect("connect other tenant scope");
-    assert!(other_store.read_stream(&other_tenant_id, &stream)
-        .expect("isolated tenant read").is_empty());
+    assert!(
+        other_store
+            .read_stream(&other_tenant_id, &stream)
+            .expect("isolated tenant read")
+            .is_empty()
+    );
 
     let mut conflicting_draft = draft(&tenant, &stream, 1, "event-1");
     conflicting_draft.reason_codes.push("tampered".to_owned());
-    let reused_id = seal_event(conflicting_draft, GENESIS_PREVIOUS_HASH)
-        .expect("seal conflicting payload");
+    let reused_id =
+        seal_event(conflicting_draft, GENESIS_PREVIOUS_HASH).expect("seal conflicting payload");
     // Same event identity with different canonical bytes must never be accepted.
     assert!(store.append(reused_id).is_err());
 
-    let gap = seal_event(
-        draft(&tenant, &stream, 4, "event-gap"),
-        &second.event_hash,
-    ).expect("seal sequence gap");
+    let gap = seal_event(draft(&tenant, &stream, 4, "event-gap"), &second.event_hash)
+        .expect("seal sequence gap");
     assert!(store.append(gap).is_err());
 }
