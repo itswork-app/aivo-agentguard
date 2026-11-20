@@ -83,11 +83,19 @@ impl PostgresEvidenceStore {
     /// # Panics
     /// Does not panic.
     #[must_use]
-    pub fn from_client(client: Client, authenticated_tenant_id: &str) -> Self {
-        Self {
+    pub fn from_client(
+        client: Client,
+        authenticated_tenant_id: &str,
+    ) -> Result<Self, PostgresEvidenceStoreError> {
+        if authenticated_tenant_id.trim().is_empty() {
+            return Err(PostgresEvidenceStoreError::Conflict(
+                "authenticated tenant scope is required",
+            ));
+        }
+        Ok(Self {
             client: Mutex::new(client),
             authenticated_tenant_id: authenticated_tenant_id.to_owned(),
-        }
+        })
     }
 
     fn lock_client(&self) -> Result<std::sync::MutexGuard<'_, Client>, PostgresEvidenceStoreError> {
