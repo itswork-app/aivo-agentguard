@@ -164,6 +164,24 @@ impl AppendOnlyEvidenceStore for PostgresEvidenceStore {
             }
             events.push(event);
         }
+        let head = transaction.query_opt(
+            "SELECT last_sequence, last_event_hash FROM agentguard_evidence_stream_heads \\
+             WHERE tenant_id = $1 AND stream_id = $2",
+            &[&tenant_id, &stream_id],
+        )?;
+        match (head, events.last()) {
+            (None, None) => {}
+            (Some(row), Some(last)) => {
+                let head_sequence: i64 = row.get(0);
+                let head_hash: String = row.get(1);
+                if i64::try_from(events.len()).ok() != Some(head_sequence)
+                    || last.event_hash != head_hash
+                {
+                    return Err(PostgresEvidenceStoreError::CorruptStoredEvent);
+                }
+            }
+            _ => return Err(PostgresEvidenceStoreError::CorruptStoredEvent),
+        }
         verify_stream(&events)?;
         transaction.commit()?;
         Ok(events)
