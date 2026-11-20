@@ -162,7 +162,11 @@ fn postgres_serializes_concurrent_writers_across_connections() {
     let events = reader
         .read_stream(&tenant, &stream)
         .expect("read concurrently written stream");
-    assert_eq!(events.len(), 1, "the stream must contain one committed event");
+    assert_eq!(
+        events.len(),
+        1,
+        "the stream must contain one committed event"
+    );
 
     reader
         .append(events[0].clone())
