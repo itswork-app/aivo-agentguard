@@ -52,7 +52,7 @@ fn postgres_append_is_atomic_idempotent_and_tenant_scoped() {
 
     let tenant = unique_id("tenant");
     let stream = unique_id("stream");
-    let store = PostgresEvidenceStore::connect(&url).expect("connect evidence store");
+    let store = PostgresEvidenceStore::connect(&url, &tenant).expect("connect evidence store");
 
     let first = seal_event(draft(&tenant, &stream, 1, "event-1"), GENESIS_PREVIOUS_HASH)
         .expect("seal first event");
