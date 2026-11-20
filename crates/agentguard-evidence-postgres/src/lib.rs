@@ -151,12 +151,21 @@ impl AppendOnlyEvidenceStore for PostgresEvidenceStore {
 
         // Exact retries are idempotent; a reused ID with different bytes is a conflict.
         if let Some(existing) = transaction.query_opt(
-            "SELECT payload_bytes
+            "SELECT sequence, previous_event_hash, event_hash, payload_bytes
              FROM agentguard_evidence_events
              WHERE tenant_id = $1 AND stream_id = $2 AND event_id = $3",
             &[&event.tenant_id, &event.stream_id, &event.event_id],
         )? {
-            let existing_payload: Vec<u8> = existing.get(0);
+            let existing_sequence: i64 = existing.get(0);
+            let existing_previous_hash: String = existing.get(1);
+            let existing_event_hash: String = existing.get(2);
+            let existing_payload: Vec<u8> = existing.get(3);
+            if existing_sequence != sequence
+                || existing_previous_hash != event.previous_event_hash
+                || existing_event_hash != event.event_hash
+            {
+                return Err(PostgresEvidenceStoreError::CorruptStoredEvent);
+            }
             if existing_payload == payload {
                 transaction.commit()?;
                 return Ok(());
@@ -237,7 +246,7 @@ impl AppendOnlyEvidenceStore for PostgresEvidenceStore {
             .read_only(true)
             .start()?;
         let rows = transaction.query(
-            "SELECT payload_bytes
+            "SELECT sequence, event_id, previous_event_hash, event_hash, payload_bytes
              FROM agentguard_evidence_events
              WHERE tenant_id = $1 AND stream_id = $2
              ORDER BY sequence ASC",
@@ -245,10 +254,20 @@ impl AppendOnlyEvidenceStore for PostgresEvidenceStore {
         )?;
         let mut events = Vec::with_capacity(rows.len());
         for row in rows {
-            let payload: Vec<u8> = row.get(0);
+            let stored_sequence: i64 = row.get(0);
+            let stored_event_id: String = row.get(1);
+            let stored_previous_hash: String = row.get(2);
+            let stored_event_hash: String = row.get(3);
+            let payload: Vec<u8> = row.get(4);
             let event: EvidenceEventV1 = serde_json::from_slice(&payload)
                 .map_err(|_| PostgresEvidenceStoreError::CorruptStoredEvent)?;
-            if event.tenant_id != tenant_id || event.stream_id != stream_id {
+            if event.tenant_id != tenant_id
+                || event.stream_id != stream_id
+                || i64::try_from(event.sequence).ok() != Some(stored_sequence)
+                || event.event_id != stored_event_id
+                || event.previous_event_hash != stored_previous_hash
+                || event.event_hash != stored_event_hash
+            {
                 return Err(PostgresEvidenceStoreError::CorruptStoredEvent);
             }
             events.push(event);
