@@ -53,22 +53,41 @@ impl From<EvidenceError> for PostgresEvidenceStoreError {
 /// from the same connection string; PostgreSQL row locks coordinate instances.
 pub struct PostgresEvidenceStore {
     client: Mutex<Client>,
+    authenticated_tenant_id: String,
 }
 
 impl PostgresEvidenceStore {
-    /// Connects to PostgreSQL. Apply the checked-in migration before use.
+    /// Connects a tenant-scoped store to PostgreSQL. The tenant ID must come
+    /// from authenticated server-side identity, never directly from request data.
+    /// Apply the checked-in migration before use. This convenience constructor
+    /// uses NoTls and is intended for local development and CI only.
     ///
     /// # Errors
-    /// Returns a database error when the connection cannot be established.
-    pub fn connect(connection_string: &str) -> Result<Self, PostgresEvidenceStoreError> {
+    /// Returns an error when the tenant scope is empty or the connection fails.
+    pub fn connect(
+        connection_string: &str,
+        authenticated_tenant_id: &str,
+    ) -> Result<Self, PostgresEvidenceStoreError> {
+        if authenticated_tenant_id.trim().is_empty() {
+            return Err(PostgresEvidenceStoreError::Conflict("authenticated tenant scope is required"));
+        }
         let client = Client::connect(connection_string, NoTls)?;
-        Ok(Self { client: Mutex::new(client) })
+        Ok(Self {
+            client: Mutex::new(client),
+            authenticated_tenant_id: authenticated_tenant_id.to_owned(),
+        })
     }
 
-    /// Constructs a store from an already configured PostgreSQL client.
+    /// Constructs a tenant-scoped store from a TLS-configured PostgreSQL client.
+    ///
+    /// # Panics
+    /// Does not panic.
     #[must_use]
-    pub fn from_client(client: Client) -> Self {
-        Self { client: Mutex::new(client) }
+    pub fn from_client(client: Client, authenticated_tenant_id: &str) -> Self {
+        Self {
+            client: Mutex::new(client),
+            authenticated_tenant_id: authenticated_tenant_id.to_owned(),
+        }
     }
 
     fn lock_client(&self) -> Result<std::sync::MutexGuard<'_, Client>, PostgresEvidenceStoreError> {
@@ -80,6 +99,9 @@ impl AppendOnlyEvidenceStore for PostgresEvidenceStore {
     type Error = PostgresEvidenceStoreError;
 
     fn append(&self, event: EvidenceEventV1) -> Result<(), Self::Error> {
+        if event.tenant_id != self.authenticated_tenant_id {
+            return Err(PostgresEvidenceStoreError::Conflict("event tenant does not match authenticated tenant scope"));
+        }
         verify_event(&event)?;
         let sequence = i64::try_from(event.sequence)
             .map_err(|_| PostgresEvidenceStoreError::IntegerOutOfRange)?;
@@ -142,8 +164,11 @@ impl AppendOnlyEvidenceStore for PostgresEvidenceStore {
         tenant_id: &str,
         stream_id: &str,
     ) -> Result<Vec<EvidenceEventV1>, Self::Error> {
-        if tenant_id.trim().is_empty() || stream_id.trim().is_empty() {
-            return Err(PostgresEvidenceStoreError::Conflict("tenant and stream IDs are required"));
+        if tenant_id != self.authenticated_tenant_id {
+            return Err(PostgresEvidenceStoreError::Conflict("requested tenant does not match authenticated tenant scope"));
+        }
+        if stream_id.trim().is_empty() {
+            return Err(PostgresEvidenceStoreError::Conflict("stream ID is required"));
         }
         let mut client = self.lock_client()?;
         let mut transaction = client.build_transaction()
