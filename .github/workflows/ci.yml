@@ -18,6 +18,22 @@ jobs:
   quality:
     name: Format, lint, and test
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16.6-alpine
+        env:
+          POSTGRES_USER: agentguard
+          POSTGRES_PASSWORD: agentguard
+          POSTGRES_DB: agentguard_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U agentguard -d agentguard_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://agentguard:agentguard@localhost:5432/agentguard_test
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
