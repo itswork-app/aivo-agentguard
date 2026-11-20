@@ -123,7 +123,8 @@ impl PostgresEvidenceStore {
              FROM agentguard_evidence_events
              WHERE tenant_id = $1 AND stream_id = $2 AND event_id = $3",
             &[&event.tenant_id, &event.stream_id, &event.event_id],
-        )? else {
+        )?
+        else {
             return Ok(false);
         };
         let stored_sequence: i64 = existing.get(0);
