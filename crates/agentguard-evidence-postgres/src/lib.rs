@@ -6,8 +6,8 @@
 //! committed-events table to the application role.
 
 use agentguard_evidence::{
-    verify_event, verify_stream, AppendOnlyEvidenceStore, EvidenceError, EvidenceEventV1,
-    GENESIS_PREVIOUS_HASH,
+    AppendOnlyEvidenceStore, EvidenceError, EvidenceEventV1, GENESIS_PREVIOUS_HASH, verify_event,
+    verify_stream,
 };
 use postgres::{Client, NoTls};
 use std::{error::Error, fmt, sync::Mutex};
@@ -108,9 +108,7 @@ impl PostgresEvidenceStore {
         })
     }
 
-    fn lock_client(
-        &self,
-    ) -> Result<std::sync::MutexGuard<'_, Client>, PostgresEvidenceStoreError> {
+    fn lock_client(&self) -> Result<std::sync::MutexGuard<'_, Client>, PostgresEvidenceStoreError> {
         self.client
             .lock()
             .map_err(|_| PostgresEvidenceStoreError::LockPoisoned)
@@ -228,7 +226,9 @@ impl AppendOnlyEvidenceStore for PostgresEvidenceStore {
             ));
         }
         if stream_id.trim().is_empty() {
-            return Err(PostgresEvidenceStoreError::Conflict("stream ID is required"));
+            return Err(PostgresEvidenceStoreError::Conflict(
+                "stream ID is required",
+            ));
         }
         let mut client = self.lock_client()?;
         let mut transaction = client
