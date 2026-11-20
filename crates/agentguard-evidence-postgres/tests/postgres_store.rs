@@ -103,4 +103,17 @@ fn postgres_append_is_atomic_idempotent_and_tenant_scoped() {
     let gap = seal_event(draft(&tenant, &stream, 4, "event-gap"), &second.event_hash)
         .expect("seal sequence gap");
     assert!(store.append(gap).is_err());
+
+    migration_client
+        .execute(
+            "UPDATE agentguard_evidence_events
+             SET event_hash = $1
+             WHERE tenant_id = $2 AND stream_id = $3 AND event_id = $4",
+            &[&"f".repeat(64), &tenant, &stream, &"event-1"],
+        )
+        .expect("tamper denormalized event hash column");
+    assert!(
+        store.read_stream(&tenant, &stream).is_err(),
+        "read must detect indexed-column and sealed-payload disagreement"
+    );
 }
