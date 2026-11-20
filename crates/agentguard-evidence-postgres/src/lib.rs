@@ -156,13 +156,19 @@ impl AppendOnlyEvidenceStore for PostgresEvidenceStore {
              WHERE tenant_id = $1 AND stream_id = $2 AND event_id = $3",
             &[&event.tenant_id, &event.stream_id, &event.event_id],
         )? {
-            let existing_sequence: i64 = existing.get(0);
-            let existing_previous_hash: String = existing.get(1);
-            let existing_event_hash: String = existing.get(2);
+            let stored_sequence: i64 = existing.get(0);
+            let stored_previous_hash: String = existing.get(1);
+            let stored_event_hash: String = existing.get(2);
             let existing_payload: Vec<u8> = existing.get(3);
-            if existing_sequence != sequence
-                || existing_previous_hash != event.previous_event_hash
-                || existing_event_hash != event.event_hash
+            let stored_event: EvidenceEventV1 = serde_json::from_slice(&existing_payload)
+                .map_err(|_| PostgresEvidenceStoreError::CorruptStoredEvent)?;
+            verify_event(&stored_event)?;
+            if stored_event.tenant_id != event.tenant_id
+                || stored_event.stream_id != event.stream_id
+                || i64::try_from(stored_event.sequence).ok() != Some(stored_sequence)
+                || stored_event.event_id != event.event_id
+                || stored_event.previous_event_hash != stored_previous_hash
+                || stored_event.event_hash != stored_event_hash
             {
                 return Err(PostgresEvidenceStoreError::CorruptStoredEvent);
             }
