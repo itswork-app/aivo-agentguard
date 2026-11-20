@@ -104,12 +104,14 @@ fn postgres_append_is_atomic_idempotent_and_tenant_scoped() {
         .expect("seal sequence gap");
     assert!(store.append(gap).is_err());
 
+    let tampered_hash = "f".repeat(64);
+    let first_event_id = "event-1";
     migration_client
         .execute(
             "UPDATE agentguard_evidence_events
              SET event_hash = $1
              WHERE tenant_id = $2 AND stream_id = $3 AND event_id = $4",
-            &[&"f".repeat(64), &tenant, &stream, &"event-1"],
+            &[&tampered_hash, &tenant, &stream, &first_event_id],
         )
         .expect("tamper denormalized event hash column");
     assert!(
