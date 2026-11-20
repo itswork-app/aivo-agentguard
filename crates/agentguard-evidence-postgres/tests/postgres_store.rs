@@ -105,7 +105,7 @@ fn postgres_append_is_atomic_idempotent_and_tenant_scoped() {
     assert!(store.append(gap).is_err());
 
     let tampered_hash = "f".repeat(64);
-    let first_event_id = "event-1";
+    let first_event_id = "event-1".to_owned();
     migration_client
         .execute(
             "UPDATE agentguard_evidence_events
