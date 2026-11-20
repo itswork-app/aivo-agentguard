@@ -66,9 +66,12 @@ fn postgres_append_is_atomic_idempotent_and_tenant_scoped() {
     let events = store.read_stream(&tenant, &stream).expect("read stream");
     assert_eq!(events, vec![first.clone(), second.clone()]);
 
-    let other_tenant = store.read_stream(&unique_id("other-tenant"), &stream)
-        .expect("tenant-scoped read");
-    assert!(other_tenant.is_empty());
+    assert!(store.read_stream(&unique_id("other-tenant"), &stream).is_err());
+    let other_tenant_id = unique_id("other-tenant");
+    let other_store = PostgresEvidenceStore::connect(&url, &other_tenant_id)
+        .expect("connect other tenant scope");
+    assert!(other_store.read_stream(&other_tenant_id, &stream)
+        .expect("isolated tenant read").is_empty());
 
     let mut conflicting_draft = draft(&tenant, &stream, 1, "event-1");
     conflicting_draft.reason_codes.push("tampered".to_owned());
