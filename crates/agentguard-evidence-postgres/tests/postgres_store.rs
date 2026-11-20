@@ -1,6 +1,6 @@
 use agentguard_evidence::{
-    seal_event, ActorRefV1, AppendOnlyEvidenceStore, DecisionOutcome, EvidenceEventDraftV1,
-    EvidenceEventType, GENESIS_PREVIOUS_HASH,
+    ActorRefV1, AppendOnlyEvidenceStore, DecisionOutcome, EvidenceEventDraftV1, EvidenceEventType,
+    GENESIS_PREVIOUS_HASH, seal_event,
 };
 use agentguard_evidence_postgres::PostgresEvidenceStore;
 use postgres::{Client, NoTls};
@@ -78,12 +78,14 @@ fn postgres_append_is_atomic_idempotent_and_tenant_scoped() {
     let events = store.read_stream(&tenant, &stream).expect("read stream");
     assert_eq!(events, vec![first.clone(), second.clone()]);
 
-    assert!(store
-        .read_stream(&unique_id("other-tenant"), &stream)
-        .is_err());
+    assert!(
+        store
+            .read_stream(&unique_id("other-tenant"), &stream)
+            .is_err()
+    );
     let other_tenant_id = unique_id("other-tenant");
-    let other_store = PostgresEvidenceStore::connect(&url, &other_tenant_id)
-        .expect("connect other tenant scope");
+    let other_store =
+        PostgresEvidenceStore::connect(&url, &other_tenant_id).expect("connect other tenant scope");
     assert!(
         other_store
             .read_stream(&other_tenant_id, &stream)
