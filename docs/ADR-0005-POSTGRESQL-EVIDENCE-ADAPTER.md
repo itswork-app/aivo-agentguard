@@ -1,6 +1,6 @@
 # ADR-0005: PostgreSQL as the First Durable Evidence Adapter
 
-**Status:** Proposed in PR #16; requires Product Owner acceptance before implementation
+**Status:** Accepted — Product Owner approval received 2026-11-20
 **Date:** 2026-11-20
 **Decision scope:** First durable reference adapter for G4.4
 
@@ -12,9 +12,9 @@ The first adapter should support a shared runtime deployment with multiple proce
 
 ## Decision
 
-Recommend PostgreSQL as the first durable reference adapter, behind the existing storage trait. The adapter should use standard PostgreSQL transactions, constraints, and row-level locking/conditional updates. The evidence core remains database-agnostic.
+PostgreSQL is the first durable reference adapter, behind the existing storage trait. The adapter will use standard PostgreSQL transactions, constraints, and row-level locking/conditional updates. The evidence core remains database-agnostic.
 
-This is a proposal for Product Owner acceptance. It does not authorize a production deployment or a claim of audited durability.
+This decision authorizes implementation of the reference adapter only. It does not authorize a production deployment or a claim of audited durability.
 
 ## Why PostgreSQL
 
@@ -63,7 +63,6 @@ Trade-offs:
 
 ## Acceptance and follow-up
 
-- Product Owner accepts or rejects PostgreSQL as the first reference backend.
-- If accepted, implement the adapter in a separate feature branch and PR with migrations and the full G4.4 conformance suite.
+- Implement the adapter in a separate feature branch and PR with migrations and the full G4.4 conformance suite.
 - Run PostgreSQL integration tests in CI using a pinned major version.
 - Keep signed checkpoints, multi-region consensus, and external security review as separate follow-up gates.
