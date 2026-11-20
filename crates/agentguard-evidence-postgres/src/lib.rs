@@ -1,4 +1,4 @@
-//! PostgreSQL reference adapter for AgentGuard append-only evidence.
+//! PostgreSQL reference adapter for `AgentGuard` append-only evidence.
 //!
 //! This adapter serializes appends per stream using a PostgreSQL row lock.
 //! A successful append is acknowledged only after the transaction commits.
@@ -68,7 +68,7 @@ impl PostgresEvidenceStore {
     /// Connects a tenant-scoped store to PostgreSQL. The tenant ID must come
     /// from authenticated server-side identity, never directly from request data.
     /// Apply the checked-in migration before use. This convenience constructor
-    /// uses NoTls and is intended for local development and CI only.
+    /// uses `NoTls` and is intended for local development and CI only.
     ///
     /// # Errors
     /// Returns an error when the tenant scope is empty or the connection fails.
@@ -92,7 +92,6 @@ impl PostgresEvidenceStore {
     ///
     /// # Errors
     /// Returns an error when the authenticated tenant scope is empty.
-    #[must_use]
     pub fn from_client(
         client: Client,
         authenticated_tenant_id: &str,
@@ -112,6 +111,43 @@ impl PostgresEvidenceStore {
         self.client
             .lock()
             .map_err(|_| PostgresEvidenceStoreError::LockPoisoned)
+    }
+
+    fn verify_existing_event(
+        transaction: &mut postgres::Transaction<'_>,
+        event: &EvidenceEventV1,
+        payload: &[u8],
+    ) -> Result<bool, PostgresEvidenceStoreError> {
+        let Some(existing) = transaction.query_opt(
+            "SELECT sequence, previous_event_hash, event_hash, payload_bytes
+             FROM agentguard_evidence_events
+             WHERE tenant_id = $1 AND stream_id = $2 AND event_id = $3",
+            &[&event.tenant_id, &event.stream_id, &event.event_id],
+        )? else {
+            return Ok(false);
+        };
+        let stored_sequence: i64 = existing.get(0);
+        let stored_previous_hash: String = existing.get(1);
+        let stored_event_hash: String = existing.get(2);
+        let existing_payload: Vec<u8> = existing.get(3);
+        let stored_event: EvidenceEventV1 = serde_json::from_slice(&existing_payload)
+            .map_err(|_| PostgresEvidenceStoreError::CorruptStoredEvent)?;
+        verify_event(&stored_event)?;
+        if stored_event.tenant_id != event.tenant_id
+            || stored_event.stream_id != event.stream_id
+            || i64::try_from(stored_event.sequence).ok() != Some(stored_sequence)
+            || stored_event.event_id != event.event_id
+            || stored_event.previous_event_hash != stored_previous_hash
+            || stored_event.event_hash != stored_event_hash
+        {
+            return Err(PostgresEvidenceStoreError::CorruptStoredEvent);
+        }
+        if existing_payload == payload {
+            return Ok(true);
+        }
+        Err(PostgresEvidenceStoreError::Conflict(
+            "event ID reused with different payload",
+        ))
     }
 }
 
@@ -150,35 +186,9 @@ impl AppendOnlyEvidenceStore for PostgresEvidenceStore {
         let last_hash: String = head.get(1);
 
         // Exact retries are idempotent; a reused ID with different bytes is a conflict.
-        if let Some(existing) = transaction.query_opt(
-            "SELECT sequence, previous_event_hash, event_hash, payload_bytes
-             FROM agentguard_evidence_events
-             WHERE tenant_id = $1 AND stream_id = $2 AND event_id = $3",
-            &[&event.tenant_id, &event.stream_id, &event.event_id],
-        )? {
-            let stored_sequence: i64 = existing.get(0);
-            let stored_previous_hash: String = existing.get(1);
-            let stored_event_hash: String = existing.get(2);
-            let existing_payload: Vec<u8> = existing.get(3);
-            let stored_event: EvidenceEventV1 = serde_json::from_slice(&existing_payload)
-                .map_err(|_| PostgresEvidenceStoreError::CorruptStoredEvent)?;
-            verify_event(&stored_event)?;
-            if stored_event.tenant_id != event.tenant_id
-                || stored_event.stream_id != event.stream_id
-                || i64::try_from(stored_event.sequence).ok() != Some(stored_sequence)
-                || stored_event.event_id != event.event_id
-                || stored_event.previous_event_hash != stored_previous_hash
-                || stored_event.event_hash != stored_event_hash
-            {
-                return Err(PostgresEvidenceStoreError::CorruptStoredEvent);
-            }
-            if existing_payload == payload {
-                transaction.commit()?;
-                return Ok(());
-            }
-            return Err(PostgresEvidenceStoreError::Conflict(
-                "event ID reused with different payload",
-            ));
+        if Self::verify_existing_event(&mut transaction, &event, &payload)? {
+            transaction.commit()?;
+            return Ok(());
         }
 
         let expected_sequence = last_sequence
