@@ -40,13 +40,21 @@ impl fmt::Display for PostgresEvidenceStoreError {
 impl Error for PostgresEvidenceStoreError {}
 
 impl From<postgres::Error> for PostgresEvidenceStoreError {
-    fn from(value: postgres::Error) -> Self { Self::Database(value) }
+    fn from(value: postgres::Error) -> Self {
+        Self::Database(value)
+    }
 }
+
 impl From<serde_json::Error> for PostgresEvidenceStoreError {
-    fn from(value: serde_json::Error) -> Self { Self::Serialization(value) }
+    fn from(value: serde_json::Error) -> Self {
+        Self::Serialization(value)
+    }
 }
+
 impl From<EvidenceError> for PostgresEvidenceStoreError {
-    fn from(value: EvidenceError) -> Self { Self::Evidence(value) }
+    fn from(value: EvidenceError) -> Self {
+        Self::Evidence(value)
+    }
 }
 
 /// A synchronous PostgreSQL store. Clone by constructing another instance
@@ -69,7 +77,9 @@ impl PostgresEvidenceStore {
         authenticated_tenant_id: &str,
     ) -> Result<Self, PostgresEvidenceStoreError> {
         if authenticated_tenant_id.trim().is_empty() {
-            return Err(PostgresEvidenceStoreError::Conflict("authenticated tenant scope is required"));
+            return Err(PostgresEvidenceStoreError::Conflict(
+                "authenticated tenant scope is required",
+            ));
         }
         let client = Client::connect(connection_string, NoTls)?;
         Ok(Self {
@@ -98,8 +108,12 @@ impl PostgresEvidenceStore {
         })
     }
 
-    fn lock_client(&self) -> Result<std::sync::MutexGuard<'_, Client>, PostgresEvidenceStoreError> {
-        self.client.lock().map_err(|_| PostgresEvidenceStoreError::LockPoisoned)
+    fn lock_client(
+        &self,
+    ) -> Result<std::sync::MutexGuard<'_, Client>, PostgresEvidenceStoreError> {
+        self.client
+            .lock()
+            .map_err(|_| PostgresEvidenceStoreError::LockPoisoned)
     }
 }
 
@@ -108,7 +122,9 @@ impl AppendOnlyEvidenceStore for PostgresEvidenceStore {
 
     fn append(&self, event: EvidenceEventV1) -> Result<(), Self::Error> {
         if event.tenant_id != self.authenticated_tenant_id {
-            return Err(PostgresEvidenceStoreError::Conflict("event tenant does not match authenticated tenant scope"));
+            return Err(PostgresEvidenceStoreError::Conflict(
+                "event tenant does not match authenticated tenant scope",
+            ));
         }
         verify_event(&event)?;
         let sequence = i64::try_from(event.sequence)
@@ -118,12 +134,18 @@ impl AppendOnlyEvidenceStore for PostgresEvidenceStore {
         let mut transaction = client.transaction()?;
 
         transaction.execute(
-            "INSERT INTO agentguard_evidence_stream_heads              (tenant_id, stream_id, last_sequence, last_event_hash)              VALUES ($1, $2, 0, $3) ON CONFLICT (tenant_id, stream_id) DO NOTHING",
+            "INSERT INTO agentguard_evidence_stream_heads
+                (tenant_id, stream_id, last_sequence, last_event_hash)
+             VALUES ($1, $2, 0, $3)
+             ON CONFLICT (tenant_id, stream_id) DO NOTHING",
             &[&event.tenant_id, &event.stream_id, &GENESIS_PREVIOUS_HASH],
         )?;
 
         let head = transaction.query_one(
-            "SELECT last_sequence, last_event_hash FROM agentguard_evidence_stream_heads              WHERE tenant_id = $1 AND stream_id = $2 FOR UPDATE",
+            "SELECT last_sequence, last_event_hash
+             FROM agentguard_evidence_stream_heads
+             WHERE tenant_id = $1 AND stream_id = $2
+             FOR UPDATE",
             &[&event.tenant_id, &event.stream_id],
         )?;
         let last_sequence: i64 = head.get(0);
@@ -131,7 +153,9 @@ impl AppendOnlyEvidenceStore for PostgresEvidenceStore {
 
         // Exact retries are idempotent; a reused ID with different bytes is a conflict.
         if let Some(existing) = transaction.query_opt(
-            "SELECT payload_bytes FROM agentguard_evidence_events              WHERE tenant_id = $1 AND stream_id = $2 AND event_id = $3",
+            "SELECT payload_bytes
+             FROM agentguard_evidence_events
+             WHERE tenant_id = $1 AND stream_id = $2 AND event_id = $3",
             &[&event.tenant_id, &event.stream_id, &event.event_id],
         )? {
             let existing_payload: Vec<u8> = existing.get(0);
@@ -139,29 +163,55 @@ impl AppendOnlyEvidenceStore for PostgresEvidenceStore {
                 transaction.commit()?;
                 return Ok(());
             }
-            return Err(PostgresEvidenceStoreError::Conflict("event ID reused with different payload"));
+            return Err(PostgresEvidenceStoreError::Conflict(
+                "event ID reused with different payload",
+            ));
         }
 
-        let expected_sequence = last_sequence.checked_add(1)
+        let expected_sequence = last_sequence
+            .checked_add(1)
             .ok_or(PostgresEvidenceStoreError::IntegerOutOfRange)?;
         if sequence != expected_sequence {
-            return Err(PostgresEvidenceStoreError::Conflict("sequence is not the next stream sequence"));
+            return Err(PostgresEvidenceStoreError::Conflict(
+                "sequence is not the next stream sequence",
+            ));
         }
         if event.previous_event_hash != last_hash {
-            return Err(PostgresEvidenceStoreError::Conflict("predecessor hash does not match committed stream head"));
+            return Err(PostgresEvidenceStoreError::Conflict(
+                "predecessor hash does not match committed stream head",
+            ));
         }
 
         transaction.execute(
-            "INSERT INTO agentguard_evidence_events              (tenant_id, stream_id, sequence, event_id, previous_event_hash, event_hash, payload_bytes)              VALUES ($1, $2, $3, $4, $5, $6, $7)",
-            &[&event.tenant_id, &event.stream_id, &sequence, &event.event_id,
-              &event.previous_event_hash, &event.event_hash, &payload],
+            "INSERT INTO agentguard_evidence_events
+                (tenant_id, stream_id, sequence, event_id, previous_event_hash, event_hash, payload_bytes)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)",
+            &[
+                &event.tenant_id,
+                &event.stream_id,
+                &sequence,
+                &event.event_id,
+                &event.previous_event_hash,
+                &event.event_hash,
+                &payload,
+            ],
         )?;
         let changed = transaction.execute(
-            "UPDATE agentguard_evidence_stream_heads              SET last_sequence = $3, last_event_hash = $4              WHERE tenant_id = $1 AND stream_id = $2 AND last_sequence = $5",
-            &[&event.tenant_id, &event.stream_id, &sequence, &event.event_hash, &last_sequence],
+            "UPDATE agentguard_evidence_stream_heads
+             SET last_sequence = $3, last_event_hash = $4
+             WHERE tenant_id = $1 AND stream_id = $2 AND last_sequence = $5",
+            &[
+                &event.tenant_id,
+                &event.stream_id,
+                &sequence,
+                &event.event_hash,
+                &last_sequence,
+            ],
         )?;
         if changed != 1 {
-            return Err(PostgresEvidenceStoreError::Conflict("stream head compare-and-swap failed"));
+            return Err(PostgresEvidenceStoreError::Conflict(
+                "stream head compare-and-swap failed",
+            ));
         }
         transaction.commit()?;
         Ok(())
@@ -173,18 +223,24 @@ impl AppendOnlyEvidenceStore for PostgresEvidenceStore {
         stream_id: &str,
     ) -> Result<Vec<EvidenceEventV1>, Self::Error> {
         if tenant_id != self.authenticated_tenant_id {
-            return Err(PostgresEvidenceStoreError::Conflict("requested tenant does not match authenticated tenant scope"));
+            return Err(PostgresEvidenceStoreError::Conflict(
+                "requested tenant does not match authenticated tenant scope",
+            ));
         }
         if stream_id.trim().is_empty() {
             return Err(PostgresEvidenceStoreError::Conflict("stream ID is required"));
         }
         let mut client = self.lock_client()?;
-        let mut transaction = client.build_transaction()
+        let mut transaction = client
+            .build_transaction()
             .isolation_level(postgres::IsolationLevel::RepeatableRead)
             .read_only(true)
             .start()?;
         let rows = transaction.query(
-            "SELECT payload_bytes FROM agentguard_evidence_events              WHERE tenant_id = $1 AND stream_id = $2 ORDER BY sequence ASC",
+            "SELECT payload_bytes
+             FROM agentguard_evidence_events
+             WHERE tenant_id = $1 AND stream_id = $2
+             ORDER BY sequence ASC",
             &[&tenant_id, &stream_id],
         )?;
         let mut events = Vec::with_capacity(rows.len());
@@ -198,7 +254,8 @@ impl AppendOnlyEvidenceStore for PostgresEvidenceStore {
             events.push(event);
         }
         let head = transaction.query_opt(
-            "SELECT last_sequence, last_event_hash FROM agentguard_evidence_stream_heads \\
+            "SELECT last_sequence, last_event_hash
+             FROM agentguard_evidence_stream_heads
              WHERE tenant_id = $1 AND stream_id = $2",
             &[&tenant_id, &stream_id],
         )?;
